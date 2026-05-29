@@ -515,6 +515,29 @@ function QuickTxModal({ open, onClose, onSave, prefill }) {
                   </div>
                 )}
               </div>
+              {ticker.trim() && cls && (
+                <div className="mt-2 flex items-center gap-1.5">
+                  <span className="text-[11px] text-ink-500 font-medium">
+                    {window.localStorage.getItem('wealthos_lang') === 'th' ? 'ประเภทสินทรัพย์:' : 'Asset Class:'}
+                  </span>
+                  <span
+                    className="inline-flex items-center gap-1 px-2 py-0.5 rounded text-[11px] font-semibold border"
+                    style={{
+                      color: window.DataLayer.ASSET_CLASSES[cls]?.color || 'oklch(0.55 0.22 264)',
+                      borderColor: `color-mix(in oklch, ${window.DataLayer.ASSET_CLASSES[cls]?.color || 'oklch(0.55 0.22 264)'} 30%, transparent)`,
+                      background: `color-mix(in oklch, ${window.DataLayer.ASSET_CLASSES[cls]?.color || 'oklch(0.55 0.22 264)'} 10%, transparent)`
+                    }}
+                  >
+                    {cls === 'us' && <Icon.Globe size={11}/>}
+                    {cls === 'th' && <Icon.Building size={11}/>}
+                    {cls === 'fund' && <Icon.PieChart size={11}/>}
+                    {cls === 'gold' && <Icon.Coins size={11}/>}
+                    {cls === 'crypto' && <Icon.Bitcoin size={11}/>}
+                    {cls === 'cash' && <Icon.Banknote size={11}/>}
+                    {t.classes[cls] || cls}
+                  </span>
+                </div>
+              )}
             </Field>
 
             {/* Asset Name */}
