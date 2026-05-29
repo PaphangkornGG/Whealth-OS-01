@@ -30,6 +30,7 @@ function AssetTable({ externalFilter, onClearFilter }) {
   const [sortDir, setSortDir] = React.useState('desc');
   const [filterCls, setFilterCls] = React.useState('all');
   const [selected, setSelected] = React.useState(null);
+  const [search, setSearch] = React.useState('');
 
   // External (parent-controlled) filter takes precedence over internal class filter
   const activeBroker = externalFilter?.broker || null;
@@ -45,6 +46,16 @@ function AssetTable({ externalFilter, onClearFilter }) {
     if (activeCls) filtered = filtered.filter(a => a.cls === activeCls);
     if (activeBroker) filtered = filtered.filter(a => a.broker === activeBroker);
     if (!activeCls && filterCls !== 'all') filtered = filtered.filter(a => a.cls === filterCls);
+    
+    // Apply name and symbol search filter
+    if (search.trim()) {
+      const q = search.toLowerCase().trim();
+      filtered = filtered.filter(a => 
+        a.ticker.toLowerCase().includes(q) || 
+        a.name.toLowerCase().includes(q)
+      );
+    }
+
     const sorted = [...filtered].sort((a,b) => {
       let av = a[sortBy], bv = b[sortBy];
       if (sortBy === 'ticker' || sortBy === 'cls') {
@@ -54,7 +65,7 @@ function AssetTable({ externalFilter, onClearFilter }) {
       return sortDir === 'asc' ? av - bv : bv - av;
     });
     return sorted;
-  }, [sortBy, sortDir, filterCls, activeBroker, activeCls]);
+  }, [sortBy, sortDir, filterCls, activeBroker, activeCls, search]);
 
   const filters = [
     { id: 'all', label: t.all, count: ENRICHED.length },
@@ -92,6 +103,31 @@ function AssetTable({ externalFilter, onClearFilter }) {
             </button>
           )}
         </div>
+
+        {/* Search Bar */}
+        <div className="flex items-center gap-3 flex-1 max-w-[240px] mx-4">
+          <div className="relative w-full">
+            <span className="absolute left-2.5 top-1/2 -translate-y-1/2 text-ink-400">
+              <Icon.Search size={12}/>
+            </span>
+            <input
+              type="text"
+              value={search}
+              onChange={(e) => setSearch(e.target.value)}
+              placeholder={window.localStorage.getItem('wealthos_lang') === 'th' ? 'ค้นหาชื่อ/ตัวย่อ...' : 'Search name/symbol...'}
+              className="w-full bg-ink-100 border border-ink-200 rounded-lg pl-7 pr-7 py-1.5 text-[12px] text-ink-800 placeholder:text-ink-400 focus:outline-none focus:border-brand focus:bg-ink-0 transition-colors"
+            />
+            {search && (
+              <button
+                onClick={() => setSearch('')}
+                className="absolute right-2 top-1/2 -translate-y-1/2 text-ink-400 hover:text-ink-600 cursor-pointer"
+              >
+                <Icon.X size={10}/>
+              </button>
+            )}
+          </div>
+        </div>
+
         <div className="flex items-center gap-3">
           {!externalFilter && (
             <div className="flex items-center gap-1 bg-ink-100 rounded-lg p-1">
