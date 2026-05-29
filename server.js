@@ -46,16 +46,18 @@ const server = http.createServer(async (req, res) => {
         return res.end(JSON.stringify({ error: 'Ticker not found' }));
       }
 
-      const price = result.meta?.regularMarketPrice;
+            const price = result.meta?.regularMarketPrice;
       const prevClose = result.meta?.previousClose;
       const currency = result.meta?.currency;
+      const name = result.meta?.longName || result.meta?.shortName || result.meta?.symbol || ticker;
 
       res.writeHead(200, { 'Content-Type': 'application/json', 'Access-Control-Allow-Origin': '*' });
       return res.end(JSON.stringify({
         ticker,
         price,
         prevClose,
-        currency
+        currency,
+        name
       }));
     } catch (error) {
       res.writeHead(500, { 'Content-Type': 'application/json', 'Access-Control-Allow-Origin': '*' });

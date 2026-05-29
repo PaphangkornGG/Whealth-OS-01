@@ -118,6 +118,7 @@ function QuickTxModal({ open, onClose, onSave, prefill }) {
   const { t } = window.useT();
   const TX_TYPES = TX_TYPES_BASE.map(tx => ({ ...tx, label: t[tx.tkey] }));
   const [ticker, setTicker] = React.useState('');
+  const [name, setName] = React.useState('');
   const [type, setType] = React.useState('buy');
   const [amount, setAmount] = React.useState('');
   const [price, setPrice] = React.useState('');
@@ -138,6 +139,7 @@ function QuickTxModal({ open, onClose, onSave, prefill }) {
   React.useEffect(() => {
     if (open) {
       setTicker(prefill?.ticker || '');
+      setName(prefill?.name || '');
       setType(prefill?.type || 'buy');
       setAmount('');
       setPrice('');
@@ -156,12 +158,79 @@ function QuickTxModal({ open, onClose, onSave, prefill }) {
         if (lp && (prefill.type || 'buy') !== 'dividend') {
           setPrice(String(lp.price));
           setPriceSynced(true);
+          if (lp.name) setName(lp.name);
           if (!prefill.broker && lp.broker) setBroker(lp.broker);
         }
       }
       setTimeout(() => tickerRef.current?.focus(), 30);
     }
   }, [open, prefill]);
+
+  // Debounced auto-fetch for stock/crypto price and company name when ticker is entered
+  React.useEffect(() => {
+    if (!open || !ticker || ticker.length < 2) return;
+    
+    const upper = ticker.toUpperCase().trim();
+    
+    // 1) First check if it's already in the portfolio or seeds to save requests
+    const lp = getLivePrice(upper);
+    if (lp) {
+      setName(lp.name || lp.ticker || '');
+      if (type !== 'dividend') {
+        setPrice(String(lp.price));
+        setPriceSynced(true);
+      }
+      return;
+    }
+
+    // 2) Perform debounced fetch from Yahoo Finance proxy server
+    const controller = new AbortController();
+    const timeout = setTimeout(async () => {
+      try {
+        let queryTicker = upper;
+        const isCrypto = ['BTC','ETH','SOL','BNB','XRP','ADA','DOGE'].includes(upper);
+        const isThai = ['PTT','AOT','KBANK','SCB','BBL','ADVANC','CPALL','TISCO','EPG'].includes(upper) || /^[A-Z]{1,5}$/.test(upper);
+        
+        if (isCrypto) {
+          queryTicker = `${upper}-USD`;
+        } else if (isThai && !upper.includes('.') && !/^[A-Z]{1,5}$/.test(upper)) {
+          queryTicker = `${upper}.BK`;
+        } else if (/^[A-Z]{1,5}$/.test(upper)) {
+          // Default guess for general tickers: Thai stock first, then fall back to US
+          queryTicker = `${upper}.BK`;
+        }
+
+        const res = await fetch(`/api/price?ticker=${encodeURIComponent(queryTicker)}`, { signal: controller.signal });
+        if (res.ok) {
+          const data = await res.json();
+          if (data.price) {
+            setPrice(String(data.price));
+            setPriceSynced(true);
+            if (data.name) setName(data.name);
+          }
+        } else if (queryTicker.endsWith('.BK')) {
+          // Fallback to US stock if .BK query failed
+          const rawTicker = queryTicker.replace('.BK', '');
+          const res2 = await fetch(`/api/price?ticker=${encodeURIComponent(rawTicker)}`, { signal: controller.signal });
+          if (res2.ok) {
+            const data2 = await res2.json();
+            if (data2.price) {
+              setPrice(String(data2.price));
+              setPriceSynced(true);
+              if (data2.name) setName(data2.name);
+            }
+          }
+        }
+      } catch (err) {
+        if (err.name !== 'AbortError') console.error(err);
+      }
+    }, 600); // 600ms debounce
+    
+    return () => {
+      clearTimeout(timeout);
+      controller.abort();
+    };
+  }, [ticker, open]);
 
   React.useEffect(() => {
     if (!open) return;
@@ -243,8 +312,8 @@ function QuickTxModal({ open, onClose, onSave, prefill }) {
   const whtN = whtMode === 'none'   ? 0
              : whtMode === 'custom' ? whtCustomN
              : (netDividendN > 0 && whtAutoRate > 0
-                 ? netDividendN / (1 - whtAutoRate) - netDividendN
-                 : 0);
+                  ? netDividendN / (1 - whtAutoRate) - netDividendN
+                  : 0);
   const grossDividendN = netDividendN + whtN;
   const effectiveWhtRate = grossDividendN > 0 ? (whtN / grossDividendN) : 0;
   const suggestions = ticker
@@ -255,12 +324,14 @@ function QuickTxModal({ open, onClose, onSave, prefill }) {
     if (!livePrice) return;
     setPrice(String(livePrice.price));
     setPriceSynced(true);
+    if (livePrice.name) setName(livePrice.name);
     // If broker is empty and the held position has one, pre-fill that too
     if (!broker && livePrice.broker) setBroker(livePrice.broker);
   }
 
   function pickSuggestion(s) {
     setTicker(s.t);
+    setName(s.n);
     setShowSuggest(false);
     const lp = getLivePrice(s.t);
     if (lp && type !== 'dividend') {
@@ -286,6 +357,7 @@ function QuickTxModal({ open, onClose, onSave, prefill }) {
     if (!canSave) return;
     const payload = {
       ticker: ticker.toUpperCase(),
+      name: name.trim() || ticker.toUpperCase(),
       type,
       amount: parseFloat(amount),
       price: parseFloat(price),
@@ -396,6 +468,17 @@ function QuickTxModal({ open, onClose, onSave, prefill }) {
                   </div>
                 )}
               </div>
+            </Field>
+
+            {/* Asset Name */}
+            <Field label={t.assetName || (window.localStorage.getItem('wealthos_lang') === 'th' ? 'ชื่อสินทรัพย์' : 'Asset Name')}>
+              <input
+                type="text"
+                value={name}
+                onChange={(e) => setName(e.target.value)}
+                placeholder={window.localStorage.getItem('wealthos_lang') === 'th' ? 'เช่น Apple Inc. (ดึงข้อมูลอัตโนมัติ)' : 'e.g. Apple Inc. (auto-filled)'}
+                className="w-full bg-ink-100 border border-ink-200 rounded-lg px-3 py-2.5 text-ink-800 placeholder:text-ink-400 text-[13px] focus:outline-none focus:border-brand focus:bg-ink-0 transition-colors"
+              />
             </Field>
 
             {/* Multi-broker chooser — when selling/dividend and the same ticker

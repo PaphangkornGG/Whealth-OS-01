@@ -26,15 +26,17 @@ export default async function handler(req, res) {
       return res.status(404).json({ error: 'Ticker not found' });
     }
 
-    const price = result.meta?.regularMarketPrice;
+        const price = result.meta?.regularMarketPrice;
     const prevClose = result.meta?.previousClose;
     const currency = result.meta?.currency;
+    const name = result.meta?.longName || result.meta?.shortName || result.meta?.symbol || ticker;
 
     return res.status(200).json({
       ticker,
       price,
       prevClose,
-      currency
+      currency,
+      name
     });
   } catch (error) {
     return res.status(500).json({ error: error.message });
