@@ -619,7 +619,33 @@ function App() {
       // Re-apply each tx to the in-memory data layer so totals reflect it on reload
       fresh.forEach(tx => {
         D.TRANSACTIONS.unshift(tx);
-        const held = D.ENRICHED.find(a => a.ticker === tx.ticker);
+        let held = D.ENRICHED.find(a => a.ticker === tx.ticker && a.broker === tx.broker);
+        if (!held && tx.type === 'buy') {
+          const sibling = D.ENRICHED.find(a => a.ticker === tx.ticker);
+          held = {
+            ticker: tx.ticker,
+            name: tx.name || sibling?.name || tx.ticker,
+            cls: tx.cls || sibling?.cls || 'th',
+            ccy: tx.ccy || sibling?.ccy || 'THB',
+            broker: tx.broker,
+            units: 0,
+            avgCost: tx.price,
+            cost: 0,
+            price: tx.price,
+            value: 0,
+            valueTHB: 0,
+            unrealized: 0,
+            unrealizedPct: 0,
+            totalReturn: 0,
+            totalReturnPct: 0,
+            dividendsLifetime: 0,
+            dividendsYTD: 0,
+            feesLifetime: 0,
+            dayChangePct: 0,
+            spark: sibling?.spark || Array.from({ length: 30 }, (_, i) => 100 + i * 0.1),
+          };
+          D.ENRICHED.push(held);
+        }
         if (!held) return;
         if (tx.type === 'buy' && tx.units && tx.price) {
           const newUnits = held.units + tx.units;
@@ -631,7 +657,8 @@ function App() {
           held.value = newUnits * tx.price;
           held.valueTHB = held.ccy === 'USD' ? held.value * D.FX.USD_THB : held.value;
           held.unrealized = held.value - held.cost;
-          held.unrealizedPct = (held.unrealized / held.cost) * 100;
+          held.unrealizedPct = held.cost > 0 ? (held.unrealized / held.cost) * 100 : 0;
+          held.feesLifetime = (held.feesLifetime || 0) + (tx.fee || 0);
         } else if (tx.type === 'sell' && tx.units && tx.price) {
           const newUnits = Math.max(0, held.units - tx.units);
           const sellRatio = held.units > 0 ? newUnits / held.units : 0;

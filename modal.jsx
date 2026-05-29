@@ -387,8 +387,8 @@ function QuickTxModal({ open, onClose, onSave, prefill }) {
   }
 
   const canSave = type === 'dividend'
-    ? !!(ticker && amount && parseFloat(amount) > 0)
-    : !!(ticker && amount && price && parseFloat(amount) > 0 && parseFloat(price) > 0);
+    ? !!(ticker.trim() && name.trim() && broker && date && amount && parseFloat(amount) > 0)
+    : !!(ticker.trim() && name.trim() && broker && date && amount && price && parseFloat(amount) > 0 && parseFloat(price) > 0);
   const subtotal = type === 'dividend'
     ? (parseFloat(amount) || 0)
     : (parseFloat(amount) || 0) * (parseFloat(price) || 0);
@@ -474,7 +474,7 @@ function QuickTxModal({ open, onClose, onSave, prefill }) {
             </Field>
 
             {/* Ticker */}
-            <Field label={t.ticker} hint={t.tickerHint}>
+            <Field label={t.ticker} hint={t.tickerHint} required={true}>
               <div className="relative">
                 <input
                   ref={tickerRef}
@@ -518,7 +518,7 @@ function QuickTxModal({ open, onClose, onSave, prefill }) {
             </Field>
 
             {/* Asset Name */}
-            <Field label={t.assetName || (window.localStorage.getItem('wealthos_lang') === 'th' ? 'ชื่อสินทรัพย์' : 'Asset Name')}>
+            <Field label={t.assetName || (window.localStorage.getItem('wealthos_lang') === 'th' ? 'ชื่อสินทรัพย์' : 'Asset Name')} required={true}>
               <input
                 type="text"
                 value={name}
@@ -632,7 +632,7 @@ function QuickTxModal({ open, onClose, onSave, prefill }) {
             )}
 
             {/* Broker / Account */}
-            <Field label={t.broker} hint={t.brokerHint}>
+            <Field label={t.broker} hint={t.brokerHint} required={true}>
               <div className="relative">
                 <button
                   type="button"
@@ -707,7 +707,7 @@ function QuickTxModal({ open, onClose, onSave, prefill }) {
             </Field>
 
             {/* Date — lets you backdate or log a missed transaction */}
-            <Field label={t.txDate} hint={t.txDateHint}>
+            <Field label={t.txDate} hint={t.txDateHint} required={true}>
               <div className="relative">
                 <input
                   type="date"
@@ -731,7 +731,7 @@ function QuickTxModal({ open, onClose, onSave, prefill }) {
             {/* Amount + Price (or just Amount for dividends) */}
             {type === 'dividend' ? (
               <>
-                <Field label={t.totalReceived} hint={t.dividendHint}>
+                <Field label={t.totalReceived} hint={t.dividendHint} required={true}>
                   <div className="relative">
                     <span className="absolute left-3 top-1/2 -translate-y-1/2 text-ink-500 num text-[14px] pointer-events-none">
                       {ccyForTicker === 'USD' ? '$' : '฿'}
@@ -806,7 +806,7 @@ function QuickTxModal({ open, onClose, onSave, prefill }) {
               </>
             ) : (
               <div className="grid grid-cols-2 gap-3">
-                <Field label={t.units}>
+                <Field label={t.units} required={true}>
                   <input
                     type="number"
                     inputMode="decimal"
@@ -816,7 +816,7 @@ function QuickTxModal({ open, onClose, onSave, prefill }) {
                     className="w-full bg-ink-100 border border-ink-200 rounded-lg px-3 py-2.5 text-ink-800 placeholder:text-ink-400 num text-[14px] focus:outline-none focus:border-brand focus:bg-ink-0 transition-colors"
                   />
                 </Field>
-                <Field label={`${t.pricePerUnit}${ccyForTicker ? ` (${ccyForTicker})` : ''}`}>
+                <Field label={`${t.pricePerUnit}${ccyForTicker ? ` (${ccyForTicker})` : ''}`} required={true}>
                   <div className="relative">
                     <span className="absolute left-3 top-1/2 -translate-y-1/2 text-ink-500 num text-[14px] pointer-events-none">
                       {ccyForTicker === 'USD' ? '$' : '฿'}
@@ -968,11 +968,14 @@ function BrokerBadge({ broker, size=22 }) {
   );
 }
 
-function Field({ label, hint, children }) {
+function Field({ label, hint, required, children }) {
   return (
     <label className="block">
       <div className="flex items-center justify-between mb-1.5">
-        <span className="text-[11px] uppercase tracking-wider text-ink-500 font-medium">{label}</span>
+        <span className="text-[11px] uppercase tracking-wider text-ink-500 font-medium">
+          {label}
+          {required && <span className="text-loss ml-1 font-bold">*</span>}
+        </span>
         {hint && <span className="text-[11px] text-ink-400">{hint}</span>}
       </div>
       {children}
