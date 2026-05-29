@@ -713,13 +713,13 @@ function App() {
     // Infer currency + class for NEW positions (when not already held).
     const CRYPTO_TICKERS = ['BTC','ETH','SOL','BNB','XRP','ADA','DOGE'];
     const THAI_TICKERS = ['PTT','AOT','KBANK','SCB','BBL','ADVANC','CPALL','TISCO'];
-    const ccy = held?.ccy || sibling?.ccy
+    const ccy = tx.ccy || held?.ccy || sibling?.ccy
       || (CRYPTO_TICKERS.includes(tickerUpper) ? 'USD'
           : THAI_TICKERS.includes(tickerUpper) ? 'THB'
           : tickerUpper.includes('-') || tickerUpper.includes('&') ? 'THB' // Thai mutual fund convention
           : /^[A-Z]{1,5}$/.test(tickerUpper) ? 'USD'  // short ALL-CAPS => US stock
           : 'THB');
-    const cls = held?.cls || sibling?.cls
+    const cls = tx.cls || held?.cls || sibling?.cls
       || (CRYPTO_TICKERS.includes(tickerUpper) ? 'crypto'
           : THAI_TICKERS.includes(tickerUpper) ? 'th'
           : tickerUpper.includes('-') || tickerUpper.includes('&') ? 'fund'

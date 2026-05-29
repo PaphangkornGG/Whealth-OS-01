@@ -119,6 +119,8 @@ function QuickTxModal({ open, onClose, onSave, prefill }) {
   const TX_TYPES = TX_TYPES_BASE.map(tx => ({ ...tx, label: t[tx.tkey] }));
   const [ticker, setTicker] = React.useState('');
   const [name, setName] = React.useState('');
+  const [ccy, setCcy] = React.useState('USD');
+  const [cls, setCls] = React.useState('us');
   const [type, setType] = React.useState('buy');
   const [amount, setAmount] = React.useState('');
   const [price, setPrice] = React.useState('');
@@ -152,14 +154,23 @@ function QuickTxModal({ open, onClose, onSave, prefill }) {
       setPriceSynced(false);
       setWhtMode('auto');
       setWhtCustom('');
+      
+      // Default guess to USD / US stock
+      setCcy('USD');
+      setCls('us');
+      
       // If we have a prefill ticker, sync its price after mount
       if (prefill?.ticker) {
         const lp = getLivePrice(prefill.ticker);
-        if (lp && (prefill.type || 'buy') !== 'dividend') {
-          setPrice(String(lp.price));
-          setPriceSynced(true);
+        if (lp) {
+          if (lp.ccy) setCcy(lp.ccy);
+          if (lp.cls) setCls(lp.cls);
           if (lp.name) setName(lp.name);
-          if (!prefill.broker && lp.broker) setBroker(lp.broker);
+          if (type !== 'dividend') {
+            setPrice(String(lp.price));
+            setPriceSynced(true);
+            if (!prefill.broker && lp.broker) setBroker(lp.broker);
+          }
         }
       }
       setTimeout(() => tickerRef.current?.focus(), 30);
@@ -176,11 +187,26 @@ function QuickTxModal({ open, onClose, onSave, prefill }) {
     const lp = getLivePrice(upper);
     if (lp) {
       setName(lp.name || lp.ticker || '');
+      if (lp.ccy) setCcy(lp.ccy);
+      if (lp.cls) setCls(lp.cls);
       if (type !== 'dividend') {
         setPrice(String(lp.price));
         setPriceSynced(true);
       }
       return;
+    }
+
+    // Set initial logical guesses before network request returns
+    const isCrypto = ['BTC','ETH','SOL','BNB','XRP','ADA','DOGE'].includes(upper);
+    if (isCrypto) {
+      setCcy('USD');
+      setCls('crypto');
+    } else if (/^[A-Z]{1,5}$/.test(upper)) {
+      setCcy('USD');
+      setCls('us');
+    } else {
+      setCcy('THB');
+      setCls('th');
     }
 
     // 2) Perform debounced fetch from Yahoo Finance proxy server
@@ -189,7 +215,7 @@ function QuickTxModal({ open, onClose, onSave, prefill }) {
       try {
         let queryTicker = upper;
         const isCrypto = ['BTC','ETH','SOL','BNB','XRP','ADA','DOGE'].includes(upper);
-        const isThai = ['PTT','AOT','KBANK','SCB','BBL','ADVANC','CPALL','TISCO','EPG'].includes(upper) || /^[A-Z]{1,5}$/.test(upper);
+        const isThai = ['PTT','AOT','KBANK','SCB','BBL','ADVANC','CPALL','TISCO','EPG','BDMS','MEGA'].includes(upper) || /^[A-Z]{1,5}$/.test(upper);
         
         if (isCrypto) {
           queryTicker = `${upper}-USD`;
@@ -207,6 +233,16 @@ function QuickTxModal({ open, onClose, onSave, prefill }) {
             setPrice(String(data.price));
             setPriceSynced(true);
             if (data.name) setName(data.name);
+            
+            // Sync currency and class from Yahoo Finance response
+            if (data.currency) {
+              setCcy(data.currency);
+              if (data.currency === 'THB') {
+                setCls('th');
+              } else if (data.currency === 'USD') {
+                setCls(isCrypto ? 'crypto' : 'us');
+              }
+            }
           }
         } else if (queryTicker.endsWith('.BK')) {
           // Fallback to US stock if .BK query failed
@@ -218,6 +254,15 @@ function QuickTxModal({ open, onClose, onSave, prefill }) {
               setPrice(String(data2.price));
               setPriceSynced(true);
               if (data2.name) setName(data2.name);
+              
+              if (data2.currency) {
+                setCcy(data2.currency);
+                if (data2.currency === 'THB') {
+                  setCls('th');
+                } else if (data2.currency === 'USD') {
+                  setCls(isCrypto ? 'crypto' : 'us');
+                }
+              }
             }
           }
         }
@@ -364,6 +409,8 @@ function QuickTxModal({ open, onClose, onSave, prefill }) {
       broker: selectedBroker?.label || customBrokerLabel || null,
       fee: feeNum,
       date,
+      ccy,
+      cls,
     };
     if (type === 'dividend') {
       payload.netDividend   = netDividendN;
