@@ -465,6 +465,145 @@ function App() {
   const [toast, setToast] = React.useState(null);
   const [refreshKey, setRefreshKey] = React.useState(0);
 
+  // Real-time price syncing states
+  const [syncing, setSyncing] = React.useState(false);
+  const [lastSync, setLastSync] = React.useState('Never');
+
+  const syncPrices = async () => {
+    if (syncing) return;
+    setSyncing(true);
+    showToast('Syncing real-time prices from Yahoo Finance...');
+    
+    const D = window.DataLayer;
+    const CRYPTO_MAP = { BTC: 'BTC-USD', ETH: 'ETH-USD', SOL: 'SOL-USD' };
+    
+    let updatedCount = 0;
+    
+    // 1) Sync holdings in portfolio (D.ENRICHED)
+    for (const held of D.ENRICHED) {
+      if (held.cls === 'cash') continue;
+      
+      let queryTicker = held.ticker;
+      if (held.cls === 'crypto') queryTicker = CRYPTO_MAP[held.ticker] || `${held.ticker}-USD`;
+      else if (held.cls === 'th') queryTicker = `${held.ticker}.BK`;
+      else if (held.ticker === 'GOLDSPOT') queryTicker = 'GC=F';
+      else if (held.cls === 'fund' || held.ticker === 'GOLD96.5' || held.ticker === 'K-GOLD') {
+        // Skip mutual funds / local gold that might not have standard Yahoo Finance charts
+        continue;
+      }
+      
+      try {
+        const res = await fetch(`/api/price?ticker=${encodeURIComponent(queryTicker)}`);
+        if (res.ok) {
+          const data = await res.json();
+          if (data.price) {
+            held.price = data.price;
+            if (data.prevClose) {
+              held.dayChangePct = ((data.price - data.prevClose) / data.prevClose) * 100;
+            }
+            // Update sparkline with the new price as the latest point
+            if (held.spark && held.spark.length > 0) {
+              held.spark[held.spark.length - 1] = data.price;
+            }
+            updatedCount++;
+          }
+        }
+      } catch (err) {
+        console.error('Failed to sync', queryTicker, err);
+      }
+    }
+    
+    // 2) Sync Watchlist items
+    try {
+      const rawWatch = localStorage.getItem('netto:watchlist');
+      if (rawWatch) {
+        const watchlist = JSON.parse(rawWatch);
+        let watchUpdated = false;
+        for (const w of watchlist) {
+          let queryTicker = w.ticker;
+          if (w.cls === 'crypto') queryTicker = CRYPTO_MAP[w.ticker] || `${w.ticker}-USD`;
+          else if (w.cls === 'th') queryTicker = `${w.ticker}.BK`;
+          else if (w.ticker === 'GOLDSPOT') queryTicker = 'GC=F';
+          else if (w.cls === 'fund') continue;
+          
+          try {
+            const res = await fetch(`/api/price?ticker=${encodeURIComponent(queryTicker)}`);
+            if (res.ok) {
+              const data = await res.json();
+              if (data.price) {
+                w.price = data.price;
+                if (data.prevClose) {
+                  w.prev = data.prevClose; // Update previous close for change calculations
+                }
+                watchUpdated = true;
+              }
+            }
+          } catch (err) {
+            console.error('Failed to sync watchlist', queryTicker, err);
+          }
+        }
+        if (watchUpdated) {
+          localStorage.setItem('netto:watchlist', JSON.stringify(watchlist));
+        }
+      }
+    } catch (err) {
+      console.error(err);
+    }
+    
+    // 3) Re-calculate aggregates
+    if (updatedCount > 0) {
+      // Update each Enrich properties
+      D.ENRICHED.forEach(a => {
+        const val = a.units * a.price;
+        a.value = val;
+        a.valueTHB = a.ccy === 'USD' ? val * D.FX.USD_THB : val;
+        a.unrealized = val - a.cost;
+        a.unrealizedPct = a.cost > 0 ? (a.unrealized / a.cost) * 100 : 0;
+        a.totalReturn = a.unrealized + (a.dividendsLifetime || 0);
+        a.totalReturnPct = a.cost > 0 ? (a.totalReturn / a.cost) * 100 : 0;
+      });
+
+      D.TOTAL_THB = D.ENRICHED.reduce((s, a) => s + a.valueTHB, 0);
+      D.TOTAL_COST_THB = D.ENRICHED.reduce((s, a) => s + (a.ccy === 'USD' ? a.cost * D.FX.USD_THB : a.cost), 0);
+      D.TOTAL_DIVS_YTD_THB = D.ENRICHED.reduce((s, a) => s + (a.ccy === 'USD' ? (a.dividendsYTD || 0) * D.FX.USD_THB : (a.dividendsYTD || 0)), 0);
+      
+      // Update allocations
+      D.ALLOCATION.forEach(c => {
+        const sum = D.ENRICHED.filter(a => a.cls === c.id).reduce((s, a) => s + a.valueTHB, 0);
+        c.valueTHB = sum;
+        c.pct = sum / D.TOTAL_THB;
+        c.drift = c.pct - c.targetPct;
+      });
+      
+      D.ALLOCATION_BROKER.forEach(b => {
+        const positions = D.ENRICHED.filter(a => a.broker === b.id);
+        const sum = positions.reduce((s, a) => s + a.valueTHB, 0);
+        b.valueTHB = sum;
+        b.pct = sum / D.TOTAL_THB;
+      });
+      
+      D.DAILY_CHANGE_PCT = D.ENRICHED.reduce((s, a) => s + ((a.dayChangePct || 0) * a.valueTHB), 0) / D.TOTAL_THB;
+      D.DAILY_CHANGE_THB = D.TOTAL_THB * (D.DAILY_CHANGE_PCT / 100);
+      
+      const now = new Date();
+      setLastSync(now.toLocaleTimeString([], { hour: '2-digit', minute: '2-digit', second: '2-digit' }));
+      showToast(`Successfully synced ${updatedCount} assets from Yahoo Finance!`);
+    } else {
+      showToast('No prices updated.');
+    }
+    
+    setSyncing(false);
+    setRefreshKey(k => k + 1);
+  };
+
+  // Sync prices once on mount after Babels finishes rendering
+  React.useEffect(() => {
+    const timer = setTimeout(() => {
+      syncPrices();
+    }, 1000);
+    return () => clearTimeout(timer);
+  }, []);
+
   // Hydrate user-entered transactions from localStorage on first mount.
   React.useEffect(() => {
     try {
@@ -543,7 +682,8 @@ function App() {
     openLedger: () => setLedgerOpen(true),
     openSearch: () => showToast('Search palette coming to bento'),
     toast: showToast,
-  }), []);
+    syncPrices,
+  }), [syncing, lastSync]);
 
   function handleSave(tx) {
     setModalOpen(false);
@@ -705,13 +845,17 @@ function App() {
           <div className="mt-6 flex items-center justify-between text-[11px] text-ink-500 px-2">
             <div className="flex items-center gap-3">
               <span>Wealth OS · v0.6</span>
-              <span className="flex items-center gap-1.5">
-                <span className="w-1.5 h-1.5 rounded-full bg-gain"></span>
-                Live · last sync 12s ago
-              </span>
+              <button 
+                onClick={syncPrices} 
+                disabled={syncing}
+                className={`flex items-center gap-1.5 px-2 py-1 rounded border border-line bg-card hover:bg-surface-soft active:scale-[0.98] transition-all text-ink-700 font-semibold cursor-pointer ${syncing ? 'opacity-50 cursor-not-allowed' : ''}`}
+              >
+                <span className={`w-1.5 h-1.5 rounded-full ${syncing ? 'bg-warn animate-pulse' : 'bg-gain'}`}></span>
+                {syncing ? 'Syncing...' : `Synced: ${lastSync}`}
+              </button>
             </div>
             <div className="flex items-center gap-3">
-              <span>Prices: 15-min delayed</span>
+              <span>Prices: Live (Yahoo Finance)</span>
               <span>FX: ฿{window.DataLayer.FX.USD_THB.toFixed(2)} / USD</span>
             </div>
           </div>
