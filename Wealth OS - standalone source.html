@@ -1,0 +1,119 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8" />
+<meta name="viewport" content="width=device-width, initial-scale=1" />
+<title>Wealth OS</title>
+<link rel="preconnect" href="https://fonts.googleapis.com" />
+<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin />
+<link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700;800&family=JetBrains+Mono:wght@400;500;600;700&family=Noto+Sans+Thai:wght@400;500;600;700&display=swap" rel="stylesheet" />
+<script src="https://unpkg.com/@tailwindcss/browser@4"></script>
+<style type="text/tailwindcss">
+  @theme {
+    --font-sans: 'Inter', 'Noto Sans Thai', ui-sans-serif, system-ui;
+    --font-mono: 'JetBrains Mono', ui-monospace, monospace;
+
+    --color-bg: oklch(0.92 0.005 250);
+    --color-card: oklch(0.99 0.002 250);
+    --color-line: oklch(0.90 0.005 250);
+    --color-line2: oklch(0.85 0.006 250);
+
+    --color-surface-inverse: oklch(0.18 0.01 250);
+    --color-surface-soft:    oklch(0.95 0.005 250);
+
+    --color-lime: oklch(0.85 0.18 130);
+
+    --color-ink-0:   oklch(0.92 0.005 250);
+    --color-ink-50:  oklch(0.99 0.002 250);
+    --color-ink-100: oklch(0.95 0.005 250);
+    --color-ink-200: oklch(0.90 0.005 250);
+    --color-ink-300: oklch(0.85 0.006 250);
+    --color-ink-400: oklch(0.65 0.012 250);
+    --color-ink-500: oklch(0.52 0.012 250);
+    --color-ink-600: oklch(0.40 0.012 250);
+    --color-ink-700: oklch(0.25 0.01 250);
+    --color-ink-800: oklch(0.15 0.01 250);
+    --color-ink-900: oklch(0.08 0.01 250);
+
+    --color-brand:      oklch(0.55 0.22 264);
+    --color-brand-soft: oklch(0.55 0.22 264 / 0.12);
+    --color-gain:       oklch(0.62 0.18 145);
+    --color-gain-soft:  oklch(0.62 0.18 145 / 0.14);
+    --color-loss:       oklch(0.62 0.22 28);
+    --color-loss-soft:  oklch(0.62 0.22 28 / 0.12);
+    --color-warn:       oklch(0.72 0.16 75);
+    --color-warn-soft:  oklch(0.72 0.16 75 / 0.14);
+    --color-violet:     oklch(0.55 0.20 295);
+    --color-violet-soft: oklch(0.55 0.20 295 / 0.14);
+
+    --shadow-card: 0 1px 2px 0 oklch(0 0 0 / 0.04), 0 0 0 1px oklch(0 0 0 / 0.04);
+    --shadow-pop:  0 12px 32px -8px oklch(0 0 0 / 0.18), 0 4px 8px -2px oklch(0 0 0 / 0.08);
+  }
+</style>
+<style>
+  html, body { background: oklch(0.92 0.005 250); }
+  body {
+    font-family: 'Inter', 'Noto Sans Thai', ui-sans-serif, system-ui;
+    color: oklch(0.15 0.01 250);
+    -webkit-font-smoothing: antialiased;
+    font-feature-settings: 'cv11', 'ss01';
+  }
+  .num, .font-mono { font-variant-numeric: tabular-nums; font-feature-settings: 'tnum'; }
+  ::selection { background: oklch(0.55 0.22 264 / 0.18); }
+
+  @keyframes fadeUp { from { opacity: 0; transform: translateY(8px); } to { opacity: 1; transform: translateY(0); } }
+  .fade-up { animation: fadeUp .4s cubic-bezier(.2,.7,.2,1) both; }
+  @keyframes scaleIn { from { opacity: 0; transform: scale(.96); } to { opacity: 1; transform: scale(1); } }
+  .scale-in { animation: scaleIn .18s cubic-bezier(.2,.7,.2,1) both; }
+  @keyframes fadeIn { from { opacity: 0; } to { opacity: 1; } }
+  .fade-in { animation: fadeIn .2s ease both; }
+
+  input[type=range] { -webkit-appearance: none; height: 4px; background: oklch(0.88 0.005 250); border-radius: 999px; }
+  input[type=range]::-webkit-slider-thumb { -webkit-appearance: none; width: 16px; height: 16px; background: oklch(0.55 0.22 264); border-radius: 50%; cursor: pointer; box-shadow: 0 2px 4px rgba(0,0,0,.2); }
+  .scroll-thin::-webkit-scrollbar { width: 6px; height: 6px; }
+  .scroll-thin::-webkit-scrollbar-thumb { background: oklch(0.78 0.008 250); border-radius: 3px; }
+
+  /* Sparkline */
+  .spark { fill: none; stroke-width: 1.5; stroke-linecap: round; stroke-linejoin: round; }
+</style>
+
+<script src="https://unpkg.com/react@18.3.1/umd/react.development.js" integrity="sha384-hD6/rw4ppMLGNu3tX5cjIb+uRZ7UkRJ6BPkLpg4hAu/6onKUg4lLsHAs9EBPT82L" crossorigin="anonymous"></script>
+<script src="https://unpkg.com/react-dom@18.3.1/umd/react-dom.development.js" integrity="sha384-u6aeetuaXnQ38mYT8rp6sbXaQe3NL9t+IBXmnYxwkUI2Hw4bsp2Wvmx4yRQF1uAm" crossorigin="anonymous"></script>
+<script src="https://unpkg.com/@babel/standalone@7.29.0/babel.min.js" integrity="sha384-m08KidiNqLdpJqLq95G/LEi8Qvjl/xUYll3QILypMoQ65QorJ9Lvtp2RXYGBFj1y" crossorigin="anonymous"></script>
+</head>
+<template id="__bundler_thumbnail" data-bg-color="#e6e8ee">
+  <svg viewBox="0 0 1200 800" xmlns="http://www.w3.org/2000/svg">
+    <rect x="60" y="60" width="540" height="220" rx="28" fill="#ffffff"/>
+    <rect x="640" y="60" width="500" height="220" rx="28" fill="#ffffff"/>
+    <rect x="60" y="320" width="720" height="420" rx="28" fill="#ffffff"/>
+    <rect x="820" y="320" width="320" height="200" rx="28" fill="#1c2233"/>
+    <rect x="820" y="540" width="320" height="200" rx="28" fill="#ffffff"/>
+    <circle cx="980" cy="420" r="64" fill="none" stroke="#3b6ef5" stroke-width="14" stroke-linecap="round" stroke-dasharray="220 360" transform="rotate(135 980 420)"/>
+    <circle cx="160" cy="160" r="32" fill="#3b6ef5"/>
+    <rect x="220" y="140" width="240" height="14" rx="7" fill="#1c2233"/>
+    <rect x="220" y="170" width="160" height="10" rx="5" fill="#9aa3b7"/>
+    <path d="M 100 660 L 220 580 L 340 620 L 460 520 L 580 560 L 700 480" fill="none" stroke="#3b6ef5" stroke-width="6" stroke-linecap="round" stroke-linejoin="round"/>
+  </svg>
+</template>
+<body class="min-h-screen p-4 md:p-6">
+  <div id="root"></div>
+
+  <script type="text/babel" src="data.jsx"></script>
+  <script type="text/babel" src="history.jsx"></script>
+  <script type="text/babel" src="i18n.jsx"></script>
+  <script type="text/babel" src="icons.jsx"></script>
+  <script type="text/babel" src="modal.jsx"></script>
+  <script type="text/babel" src="ledger.jsx"></script>
+  <script type="text/babel" src="widgets.jsx"></script>
+  <script type="text/babel" src="donut.jsx"></script>
+  <script type="text/babel" src="chart.jsx"></script>
+  <script type="text/babel" src="goals.jsx"></script>
+  <script type="text/babel" src="cashflow.jsx"></script>
+  <script type="text/babel" src="watchlist.jsx"></script>
+  <script type="text/babel" src="table.jsx"></script>
+  <script type="text/babel" src="pages.jsx"></script>
+  <script type="text/babel" src="bento-pieces.jsx"></script>
+  <script type="text/babel" src="bento-pieces2.jsx"></script>
+  <script type="text/babel" src="bento-app.jsx"></script>
+</body>
+</html>
