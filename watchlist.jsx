@@ -247,7 +247,7 @@ function AddToWatchlistModal({ open, lang, existing, onClose, onSave }) {
       for (const p of proxies) {
         try {
           const controller = new AbortController();
-          const id = setTimeout(() => controller.abort(), 4000);
+          const id = setTimeout(() => controller.abort(), 2000);
           const res = await fetch(p, { signal: controller.signal });
           clearTimeout(id);
           if (res.ok) {
