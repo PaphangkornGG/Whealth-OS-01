@@ -158,7 +158,7 @@ const PORTFOLIO_SEED = [
   },
 ];
 
-const PORTFOLIO = (typeof localStorage !== 'undefined' && localStorage.getItem('netto:useMockData') === 'false') ? [] : PORTFOLIO_SEED;
+const PORTFOLIO = (typeof localStorage !== 'undefined' && localStorage.getItem('netto:useMockData') === 'true') ? PORTFOLIO_SEED : [];
 
 // Derived helpers
 function toTHB(amount, ccy) {
