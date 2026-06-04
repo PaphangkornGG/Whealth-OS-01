@@ -1771,7 +1771,6 @@ function ConnectedAppsManager({ lang, draft, updateDraft }) {
               <div className="text-gain text-[13px]">{lang === 'th' ? 'ส่งคำขอเรียบร้อย' : 'Suggestion sent'}</div>
             ) : (
               <>
-                </label>
                 <label className="block">
                   <div className="text-[10px] uppercase tracking-wider text-ink-500 font-semibold mb-1">
                     {lang === 'th' ? 'โน้ตเพิ่มเติม (ไม่บังคับ)' : 'Note (optional)'}
