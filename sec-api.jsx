@@ -47,22 +47,62 @@ class SecApi {
 
     await this.ensureMapping();
     let searchTicker = ticker.toUpperCase().trim();
-    let projData = this.fundMapping[searchTicker];
     
-    // Fallback: If not found, it might be a share class (e.g. UGIS-N).
-    // Try stripping suffixes after the last hyphen incrementally.
-    if (!projData && searchTicker.includes('-')) {
-      const parts = searchTicker.split('-');
-      for (let i = parts.length - 1; i > 0; i--) {
-        const fallbackTicker = parts.slice(0, i).join('-');
-        if (this.fundMapping[fallbackTicker]) {
-          projData = this.fundMapping[fallbackTicker];
+    // 1) Known aliases where SEC project ID differs from popular broker tickers
+    const ALIAS_MAPPING = {
+      'SCBS&P500E': 'M0643_2555',
+      'SCBS&P500A': 'M0643_2555',
+      'SCBS&P500': 'M0643_2555',
+      'SCBGOLDH': 'M0502_2554',
+      'SCBPGF': 'M0101_2557'
+    };
+
+    let projId = ALIAS_MAPPING[searchTicker];
+    let projName = null;
+
+    if (projId) {
+      // Find the project name from the ID
+      for (const key of Object.keys(this.fundMapping)) {
+        if (this.fundMapping[key].id === projId) {
+          projName = this.fundMapping[key].name;
           break;
         }
       }
-    }
+    } else {
+      let projData = this.fundMapping[searchTicker];
+      
+      // 2) Fallback: SEC often appends "FUND" to the project abbreviation (e.g. SCBGOLDHFUND)
+      if (!projData && this.fundMapping[searchTicker + 'FUND']) {
+        projData = this.fundMapping[searchTicker + 'FUND'];
+      }
+      
+      // 3) Fallback: Share class suffixes with hyphens (e.g. UGIS-N -> UGIS)
+      if (!projData && searchTicker.includes('-')) {
+        const parts = searchTicker.split('-');
+        for (let i = parts.length - 1; i > 0; i--) {
+          const fallbackTicker = parts.slice(0, i).join('-');
+          if (this.fundMapping[fallbackTicker]) {
+            projData = this.fundMapping[fallbackTicker];
+            break;
+          }
+        }
+      }
+      
+      // 4) Fallback: Share class suffixes with hyphens + "FUND" (e.g. SCBSET-A -> SCBSETFUND)
+      if (!projData && searchTicker.includes('-')) {
+        const parts = searchTicker.split('-');
+        for (let i = parts.length - 1; i > 0; i--) {
+          const fallbackTicker = parts.slice(0, i).join('-') + 'FUND';
+          if (this.fundMapping[fallbackTicker]) {
+            projData = this.fundMapping[fallbackTicker];
+            break;
+          }
+        }
+      }
 
-    const projId = projData ? projData.id : null;
+      projId = projData ? projData.id : null;
+      projName = projData ? projData.name : null;
+    }
     
     if (!projId) {
       throw new Error(`Mapping not found for ticker: ${ticker}`);
