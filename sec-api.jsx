@@ -17,8 +17,8 @@ const FUND_MAPPING = {
 
 class SecApi {
   constructor() {
-    this.dailyInfoKey = localStorage.getItem('sec:dailyInfoKey') || '';
-    this.factsheetKey = localStorage.getItem('sec:factsheetKey') || '';
+    this.dailyInfoKey = localStorage.getItem('sec:dailyInfoKey') || '4a07e3a20ba74b71963123b4de0fa965';
+    this.factsheetKey = localStorage.getItem('sec:factsheetKey') || '23137ce0651f408697a6d2ddbdb5cf14';
   }
 
   isConfigured() {
