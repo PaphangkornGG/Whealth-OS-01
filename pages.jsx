@@ -1365,32 +1365,6 @@ function SettingsPage() {
           </div>
         </div>
 
-        <div className="mt-6 pt-5 border-t border-ink-200">
-          <h4 className="text-ink-700 text-[12px] font-semibold uppercase tracking-wider mb-3">
-            {lang === 'th' ? 'ความปลอดภัยและการแจ้งเตือน' : 'Security & Notifications'}
-          </h4>
-          <div className="space-y-2.5">
-            <ToggleField
-              label={lang === 'th' ? 'ยืนยันตัวตนสองขั้นตอน (2FA)' : 'Two-factor authentication'}
-              desc={lang === 'th' ? 'รหัสผ่านถึงมือถือทุกครั้งที่ล็อกอิน' : 'Phone OTP required for every login'}
-              checked={draft.twoFA}
-              onChange={(v) => updateDraft({ twoFA: v })}
-            />
-            <ToggleField
-              label={lang === 'th' ? 'แจ้งเตือนผ่านอีเมล' : 'Email alerts'}
-              desc={lang === 'th' ? 'สรุปรายสัปดาห์, เตือนรีบาลานซ์, แจ้งปันผล' : 'Weekly summary, rebalance, dividend alerts'}
-              checked={draft.emailAlerts}
-              onChange={(v) => updateDraft({ emailAlerts: v })}
-            />
-            <ToggleField
-              label={lang === 'th' ? 'แจ้งเตือนผ่าน Push' : 'Push notifications'}
-              desc={lang === 'th' ? 'แจ้งเตือนทันทีบนอุปกรณ์' : 'Real-time alerts on device'}
-              checked={draft.pushAlerts}
-              onChange={(v) => updateDraft({ pushAlerts: v })}
-            />
-          </div>
-        </div>
-
         <div className="mt-6 pt-4 border-t border-ink-200 flex items-center justify-between gap-3">
           <div className="text-[12px] text-ink-500">
             {dirty
