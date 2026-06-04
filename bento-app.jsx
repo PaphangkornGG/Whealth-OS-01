@@ -742,7 +742,19 @@ function App() {
       if (held.cls === 'crypto') queryTicker = CRYPTO_MAP[held.ticker] || `${held.ticker}-USD`;
       else if (held.cls === 'th') queryTicker = `${held.ticker}.BK`;
       else if (held.ticker === 'GOLDSPOT') queryTicker = 'GC=F';
-      else if (held.cls === 'fund' || held.ticker === 'GOLD96.5' || held.ticker === 'K-GOLD') {
+      if (held.cls === 'fund' && window.SecApi && window.SecApi.isConfigured()) {
+        try {
+          const navData = await window.SecApi.getLatestNAV(held.ticker);
+          if (navData && navData.price) {
+            held.price = navData.price;
+            updatedCount++;
+            continue;
+          }
+        } catch(e) {
+          console.warn("SEC API skip:", e);
+        }
+      }
+      if (held.cls === 'fund' || held.ticker === 'GOLD96.5' || held.ticker === 'K-GOLD') {
         // Skip mutual funds / local gold that might not have standard Yahoo Finance charts
         continue;
       }
@@ -779,7 +791,17 @@ function App() {
           if (w.cls === 'crypto') queryTicker = CRYPTO_MAP[w.ticker] || `${w.ticker}-USD`;
           else if (w.cls === 'th') queryTicker = `${w.ticker}.BK`;
           else if (w.ticker === 'GOLDSPOT') queryTicker = 'GC=F';
-          else if (w.cls === 'fund') continue;
+          if (w.cls === 'fund' && window.SecApi && window.SecApi.isConfigured()) {
+            try {
+              const navData = await window.SecApi.getLatestNAV(w.ticker);
+              if (navData && navData.price) {
+                w.price = navData.price;
+                watchUpdated = true;
+                continue;
+              }
+            } catch(e) {}
+          }
+          if (w.cls === 'fund') continue;
           
           try {
             const res = await fetch(`/api/price?ticker=${encodeURIComponent(queryTicker)}`);

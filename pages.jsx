@@ -1151,6 +1151,16 @@ function SettingsPage() {
         <ConnectedAppsManager lang={lang}/>
       </SettingsSection>
 
+      {/* SEC API Configuration */}
+      <SettingsSection
+        title={lang === 'th' ? 'การเชื่อมต่อ API ก.ล.ต. (SEC)' : 'SEC API Connection'}
+        desc={lang === 'th'
+          ? 'กรอก Subscription Key เพื่อดึงข้อมูล NAV กองทุนรวมของไทยแบบเรียลไทม์'
+          : 'Enter your Subscription Keys to fetch real-time Thai mutual fund NAVs'}
+      >
+        <SecApiSettingsManager lang={lang} />
+      </SettingsSection>
+
       {/* Profile */}
       <SettingsSection
         title={lang === 'th' ? 'โปรไฟล์' : 'Profile'}
@@ -1754,6 +1764,53 @@ function SettingsSection({ title, desc, children }) {
         {desc && <p className="text-ink-500 text-[12px] mt-0.5">{desc}</p>}
       </div>
       {children}
+    </div>
+  );
+}
+
+function SecApiSettingsManager({ lang }) {
+  const [dailyKey, setDailyKey] = React.useState(window.SecApi ? window.SecApi.dailyInfoKey : '');
+  const [factKey, setFactKey] = React.useState(window.SecApi ? window.SecApi.factsheetKey : '');
+  const [saved, setSaved] = React.useState(false);
+
+  const handleSave = () => {
+    if (window.SecApi) {
+      window.SecApi.setKeys(dailyKey, factKey);
+      setSaved(true);
+      setTimeout(() => setSaved(false), 2000);
+    }
+  };
+
+  return (
+    <div className="flex flex-col gap-4">
+      <div className="flex flex-col gap-1.5">
+        <label className="text-sm font-medium text-ink-700">Fund Daily Info Key (Primary Key)</label>
+        <input 
+          type="text"
+          className="px-3 py-2 bg-white border border-line rounded-lg text-sm text-ink-900 focus:outline-none focus:border-brand-500 focus:ring-1 focus:ring-brand-500 transition-all"
+          value={dailyKey}
+          onChange={e => setDailyKey(e.target.value)}
+          placeholder="e.g. 4a07e3a20ba74b71963123b4de0fa965"
+        />
+      </div>
+      <div className="flex flex-col gap-1.5">
+        <label className="text-sm font-medium text-ink-700">Fund Factsheet Key (Primary Key)</label>
+        <input 
+          type="text"
+          className="px-3 py-2 bg-white border border-line rounded-lg text-sm text-ink-900 focus:outline-none focus:border-brand-500 focus:ring-1 focus:ring-brand-500 transition-all"
+          value={factKey}
+          onChange={e => setFactKey(e.target.value)}
+          placeholder="e.g. 23137ce0651f408697a6d2ddbdb5cf14"
+        />
+      </div>
+      <div>
+        <button 
+          onClick={handleSave}
+          className="px-4 py-2 bg-ink-900 hover:bg-ink-800 text-white rounded-lg text-sm font-medium transition-colors"
+        >
+          {saved ? (lang === 'th' ? 'บันทึกแล้ว ✓' : 'Saved ✓') : (lang === 'th' ? 'บันทึก API Key' : 'Save Keys')}
+        </button>
+      </div>
     </div>
   );
 }
