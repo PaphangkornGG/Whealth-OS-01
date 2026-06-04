@@ -23,7 +23,7 @@ function getLivePrice(tickerInput) {
   if (!tickerInput) return null;
   const upper = tickerInput.toUpperCase().trim();
   const found = ENRICHED.find(a => a.ticker === upper || a.ticker.startsWith(upper + '-'));
-  if (found) return { price: found.price, ccy: found.ccy, name: found.name, broker: found.broker };
+  if (found) return { price: found.price, ccy: found.ccy, name: found.name, broker: found.broker, cls: found.cls };
   // Fallback: synthesized market prices for common Thai-investor tickers
   // (mock — gives the demo live behaviour for tickers not currently held)
   const fallback = {
