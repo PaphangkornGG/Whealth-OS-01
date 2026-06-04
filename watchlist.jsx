@@ -226,6 +226,37 @@ function AddToWatchlistModal({ open, lang, existing, onClose, onSave }) {
     return next;
   });
 
+  const [fetching, setFetching] = React.useState(false);
+
+  const fetchTickerData = async () => {
+    if (!form.ticker) return;
+    setFetching(true);
+    try {
+      let queryTicker = form.ticker.toUpperCase().trim();
+      if (form.cls === 'th' && !queryTicker.endsWith('.BK')) queryTicker += '.BK';
+      if (form.cls === 'crypto' && !queryTicker.endsWith('-USD')) queryTicker += '-USD';
+      
+      const url = `https://query1.finance.yahoo.com/v8/finance/chart/${queryTicker}?interval=1d&range=1d`;
+      const proxiedUrl = `https://api.allorigins.win/raw?url=${encodeURIComponent(url)}`;
+      
+      const res = await fetch(proxiedUrl);
+      if (res.ok) {
+        const data = await res.json();
+        const meta = data?.chart?.result?.[0]?.meta;
+        if (meta) {
+          update({ 
+            name: meta.shortName || meta.longName || form.name,
+            price: (meta.regularMarketPrice || '').toString()
+          });
+        }
+      }
+    } catch (e) {
+      console.warn("Failed to sync ticker data", e);
+    } finally {
+      setFetching(false);
+    }
+  };
+
   const upper = form.ticker.toUpperCase().trim();
   const priceN = parseFloat(form.price) || 0;
   const targetN = parseFloat(form.target) || 0;
@@ -292,14 +323,19 @@ function AddToWatchlistModal({ open, lang, existing, onClose, onSave }) {
 
           {/* Ticker + name */}
           <div className="grid grid-cols-3 gap-2.5">
-            <WlField label={lang === 'th' ? 'ตัวย่อ' : 'Ticker'} className="col-span-1">
-              <input
-                ref={firstRef}
-                value={form.ticker}
-                onChange={(e) => update({ ticker: e.target.value.toUpperCase().replace(/[^A-Z0-9.\-&]/g, '') })}
-                placeholder="AAPL"
-                className="w-full bg-surface-soft border border-line rounded-md px-2.5 py-1.5 text-[13px] text-ink-900 num font-medium uppercase focus:outline-none focus:border-brand"
-              />
+            <WlField label={lang === 'th' ? 'ตัวย่อ' : 'Ticker'} className="col-span-1 relative">
+              <div className="relative">
+                <input
+                  ref={firstRef}
+                  value={form.ticker}
+                  onChange={(e) => update({ ticker: e.target.value.toUpperCase().replace(/[^A-Z0-9.\-&]/g, '') })}
+                  onBlur={fetchTickerData}
+                  onKeyDown={(e) => { if (e.key === 'Enter') { e.preventDefault(); fetchTickerData(); } }}
+                  placeholder="AAPL"
+                  className="w-full bg-surface-soft border border-line rounded-md pl-2.5 pr-7 py-1.5 text-[13px] text-ink-900 num font-medium uppercase focus:outline-none focus:border-brand"
+                />
+                {fetching && <div className="absolute right-2 top-2 w-3.5 h-3.5 border-2 border-brand border-t-transparent rounded-full animate-spin"></div>}
+              </div>
             </WlField>
             <WlField label={lang === 'th' ? 'ชื่อ' : 'Name'} className="col-span-2">
               <input
