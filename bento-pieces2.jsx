@@ -633,7 +633,7 @@ function TransactionsBento() {
             {rows.map(tx => {
               const cls = D2.ASSET_CLASSES[tx.cls] || { color: 'oklch(0.62 0.015 250)', label: tx.cls || 'Other' };
               const broker = D2.BROKERS[tx.broker];
-              const status = STATUS_TONES[tx.type];
+              const status = STATUS_TONES[tx.type] || { label: tx.type || 'Unknown', cls: 'bg-ink-300 text-ink-800' };
               // Pick a sensible unit label per asset class
               const unitLabel =
                 tx.cls === 'crypto'             ? tx.ticker :

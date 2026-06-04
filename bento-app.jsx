@@ -877,18 +877,22 @@ function App() {
               held.unrealizedPct = held.cost > 0 ? (held.unrealized / held.cost) * 100 : 0;
               held.feesLifetime = (held.feesLifetime || 0) + (tx.fee || 0);
             } else if (tx.type === 'sell' && tx.units && tx.price) {
-              const newUnits = Math.max(0, held.units - tx.units);
-              const sellRatio = held.units > 0 ? newUnits / held.units : 0;
-              held.cost = held.cost * sellRatio;
-              held.units = newUnits;
-              held.value = newUnits * tx.price;
-              held.valueTHB = held.ccy === 'USD' ? held.value * D.FX.USD_THB : held.value;
-              held.unrealized = held.value - held.cost;
-              held.unrealizedPct = held.cost > 0 ? (held.unrealized / held.cost) * 100 : 0;
-              held.price = tx.price;
+              if (held) {
+                const newUnits = Math.max(0, held.units - tx.units);
+                const sellRatio = held.units > 0 ? newUnits / held.units : 0;
+                held.cost = held.cost * sellRatio;
+                held.units = newUnits;
+                held.value = newUnits * tx.price;
+                held.valueTHB = held.ccy === 'USD' ? held.value * D.FX.USD_THB : held.value;
+                held.unrealized = held.value - held.cost;
+                held.unrealizedPct = held.cost > 0 ? (held.unrealized / held.cost) * 100 : 0;
+                held.price = tx.price;
+              }
             } else if (tx.type === 'dividend') {
-              held.dividendsYTD = (held.dividendsYTD || 0) + tx.total;
-              held.dividendsLifetime = (held.dividendsLifetime || 0) + tx.total;
+              if (held) {
+                held.dividendsYTD = (held.dividendsYTD || 0) + tx.total;
+                held.dividendsLifetime = (held.dividendsLifetime || 0) + tx.total;
+              }
             }
           });
 
@@ -949,18 +953,22 @@ function App() {
               held.unrealizedPct = held.cost > 0 ? (held.unrealized / held.cost) * 100 : 0;
               held.feesLifetime = (held.feesLifetime || 0) + (tx.fee || 0);
             } else if (tx.type === 'sell' && tx.units && tx.price) {
-              const newUnits = Math.max(0, held.units - tx.units);
-              const sellRatio = held.units > 0 ? newUnits / held.units : 0;
-              held.cost = held.cost * sellRatio;
-              held.units = newUnits;
-              held.value = newUnits * tx.price;
-              held.valueTHB = held.ccy === 'USD' ? held.value * D.FX.USD_THB : held.value;
-              held.unrealized = held.value - held.cost;
-              held.unrealizedPct = held.cost > 0 ? (held.unrealized / held.cost) * 100 : 0;
-              held.price = tx.price;
+              if (held) {
+                const newUnits = Math.max(0, held.units - tx.units);
+                const sellRatio = held.units > 0 ? newUnits / held.units : 0;
+                held.cost = held.cost * sellRatio;
+                held.units = newUnits;
+                held.value = newUnits * tx.price;
+                held.valueTHB = held.ccy === 'USD' ? held.value * D.FX.USD_THB : held.value;
+                held.unrealized = held.value - held.cost;
+                held.unrealizedPct = held.cost > 0 ? (held.unrealized / held.cost) * 100 : 0;
+                held.price = tx.price;
+              }
             } else if (tx.type === 'dividend') {
-              held.dividendsYTD = (held.dividendsYTD || 0) + tx.total;
-              held.dividendsLifetime = (held.dividendsLifetime || 0) + tx.total;
+              if (held) {
+                held.dividendsYTD = (held.dividendsYTD || 0) + tx.total;
+                held.dividendsLifetime = (held.dividendsLifetime || 0) + tx.total;
+              }
             }
           });
           if (D.recomputeDerived) D.recomputeDerived();

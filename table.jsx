@@ -175,8 +175,8 @@ function AssetTable({ externalFilter, onClearFilter }) {
               const isSel = selected === a.ticker;
               const gainPos = a.unrealizedPct >= 0;
               const totalPos = a.totalReturnPct >= 0;
-              const cls = ASSET_CLASSES[a.cls];
-              const sparkUp = a.spark[a.spark.length-1] >= a.spark[0];
+              const cls = ASSET_CLASSES[a.cls] || { color: 'oklch(0.62 0.015 250)', label: a.cls || 'Other' };
+              const sparkUp = a.spark && a.spark.length > 0 ? a.spark[a.spark.length-1] >= a.spark[0] : true;
               return (
                 <React.Fragment key={a.ticker}>
                   <tr
