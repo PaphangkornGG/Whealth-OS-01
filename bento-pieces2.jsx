@@ -173,13 +173,10 @@ function CashflowBento() {
   const monthsTH = ['ม.ค.','ก.พ.','มี.ค.','เม.ย.','พ.ค.','มิ.ย.'];
   const now = new Date(2026, 4, 27);
   // Build past 6 months Dividends + Realized Gains.
-  // Mock baselines so each month has visible non-zero values for both series.
-  const mockDividendBase = [22000, 14500, 41200, 28800, 19400, 32100];
-  const mockGainsBase    = [ 8500, 12300,  6800,  4200,  9700,  5400];
   const data = [];
   for (let i = 5; i >= 0; i--) {
-    let dividends = mockDividendBase[5 - i];
-    let gains     = mockGainsBase[5 - i];
+    let dividends = 0;
+    let gains     = 0;
     D2.TRANSACTIONS.forEach(tx => {
       const monthsAgo = (now.getFullYear() - tx.date.getFullYear()) * 12 + (now.getMonth() - tx.date.getMonth());
       if (monthsAgo === i) {
