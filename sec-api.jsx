@@ -108,46 +108,47 @@ class SecApi {
       throw new Error(`Mapping not found for ticker: ${ticker}`);
     }
 
-    // Usually we need to provide a date. If we want the latest, SEC API might not have a "latest" endpoint without date.
-    // However, some endpoints return an array of recent NAVs if date is omitted, or we might need to loop back a few days.
-    // Wait, let's try calling without date or with today's date and going back up to 5 days.
     const today = new Date();
+    const fetchPromises = [];
     
-    // We try the last 15 days to find the most recent NAV
+    // We try the last 15 days in parallel to find the most recent NAV quickly
     for (let i = 0; i < 15; i++) {
       const d = new Date(today);
       d.setDate(d.getDate() - i);
       const dateString = d.toISOString().split('T')[0];
       const url = `/api/sec?projId=${projId}&dateString=${dateString}`;
       
-      try {
-        const response = await fetch(url);
-
-        if (response.status === 200) {
-          const data = await response.json();
-          if (Array.isArray(data)) {
-             // Find specific class like SCBS&P500E
-             const specificClass = data.find(d => d.class_abbr_name === ticker);
-             if (specificClass) {
-                return { price: specificClass.last_val, date: dateString, name: projData.name };
-             }
-             // Fallback to the first one if ticker isn't exactly the class name
-             if (data.length > 0) {
-                return { price: data[0].last_val, date: dateString, name: projData.name };
-             }
-          } else if (data && data.last_val) {
-             return { price: data.last_val, date: dateString, name: projData.name };
-          }
-        }
-      } catch (e) {
-        console.error("SEC API Error:", e);
-      }
-      
-      // Go back one day
-      date.setDate(date.getDate() - 1);
+      fetchPromises.push(
+        fetch(url)
+          .then(res => res.status === 200 ? res.json() : null)
+          .then(data => ({ dateString, data, i }))
+          .catch(e => null)
+      );
     }
     
-    throw new Error('Could not fetch NAV for the past 7 days. Fund might be inactive or API limits reached.');
+    const results = await Promise.all(fetchPromises);
+    
+    // Sort by most recent (i = 0 is today, so sort by i ascending)
+    const validResults = results
+      .filter(r => r && r.data)
+      .sort((a, b) => a.i - b.i);
+      
+    if (validResults.length > 0) {
+      const { data, dateString } = validResults[0];
+      if (Array.isArray(data)) {
+        const specificClass = data.find(d => d.class_abbr_name === ticker);
+        if (specificClass) {
+          return { price: specificClass.last_val, date: dateString, name: projName };
+        }
+        if (data.length > 0) {
+          return { price: data[0].last_val, date: dateString, name: projName };
+        }
+      } else if (data && data.last_val) {
+        return { price: data.last_val, date: dateString, name: projName };
+      }
+    }
+    
+    throw new Error('Could not fetch NAV for the past 15 days. Fund might be inactive or API limits reached.');
   }
 }
 
