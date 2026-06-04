@@ -159,6 +159,7 @@
 
     txs.sort((a, b) => b.date - a.date);
     return txs;
+  }
   const useMock = typeof localStorage !== 'undefined' && localStorage.getItem('netto:useMockData') !== 'false';
   const TRANSACTIONS = useMock ? genTransactions() : [];
 
