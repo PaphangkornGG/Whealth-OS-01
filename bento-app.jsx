@@ -473,6 +473,7 @@ function LoginPortal({ onGuest, lang }) {
   const [authMode, setAuthMode] = React.useState('signin'); // 'signin' | 'signup'
   const [email, setEmail] = React.useState('');
   const [password, setPassword] = React.useState('');
+  const [fullName, setFullName] = React.useState('');
   const [loading, setLoading] = React.useState(false);
   const [errorMsg, setErrorMsg] = React.useState(null);
   const [successMsg, setSuccessMsg] = React.useState(null);
@@ -556,6 +557,18 @@ function LoginPortal({ onGuest, lang }) {
         </div>
 
         <form onSubmit={handleAuth} className="space-y-4">
+          {authMode === 'signup' && (
+            <label className="block bg-ink-100 border border-ink-200 rounded-lg px-3 py-2.5 focus-within:border-brand focus-within:bg-card transition-colors">
+              <div className="text-ink-500 text-[10px] uppercase tracking-wider font-semibold">{lang === 'th' ? 'ชื่อ-นามสกุล' : 'Full Name'}</div>
+              <input
+                type="text"
+                value={fullName}
+                onChange={(e) => setFullName(e.target.value)}
+                placeholder="John Doe"
+                className="w-full bg-transparent text-ink-800 text-[13px] mt-0.5 focus:outline-none placeholder:text-ink-400"
+              />
+            </label>
+          )}
           <label className="block bg-ink-100 border border-ink-200 rounded-lg px-3 py-2.5 focus-within:border-brand focus-within:bg-card transition-colors">
             <div className="text-ink-500 text-[10px] uppercase tracking-wider font-semibold">{lang === 'th' ? 'อีเมล' : 'Email Address'}</div>
             <input
@@ -806,6 +819,7 @@ function App() {
       if (!supabase) return;
       const { data: { session } } = await supabase.auth.getSession();
       const sessionUser = session?.user || null;
+      window.AppUser = sessionUser;
       setUser(sessionUser);
 
       if (sessionUser) {
@@ -981,6 +995,7 @@ function App() {
 
     const { data: { subscription } } = window.supabaseClient?.auth.onAuthStateChange((event, session) => {
       const activeUser = session?.user || null;
+      window.AppUser = activeUser;
       setUser(activeUser);
       if (activeUser) {
         setIsGuest(false);

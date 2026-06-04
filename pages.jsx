@@ -975,7 +975,24 @@ function SettingsPage() {
   const [profile, setProfile] = React.useState(() => {
     try {
       const raw = localStorage.getItem('netto:profile');
-      return raw ? { ...DEFAULT_PROFILE, ...JSON.parse(raw) } : { ...DEFAULT_PROFILE };
+      let base = { ...DEFAULT_PROFILE };
+      const user = window.AppUser;
+      if (user) {
+        base.email = user.email;
+      }
+      let finalProfile = raw ? { ...base, ...JSON.parse(raw) } : base;
+      
+      // Supabase metadata always overrides local storage for name/email
+      if (user) {
+        finalProfile.email = user.email;
+        if (user.user_metadata?.full_name) {
+          finalProfile.name = user.user_metadata.full_name;
+          const parts = finalProfile.name.trim().split(/\s+/).filter(Boolean);
+          if (parts.length >= 2) finalProfile.initials = (parts[0][0] + parts[1][0]).toUpperCase();
+          else if (parts.length === 1) finalProfile.initials = parts[0].slice(0, 2).toUpperCase();
+        }
+      }
+      return finalProfile;
     } catch { return { ...DEFAULT_PROFILE }; }
   });
   const [draft, setDraft] = React.useState(profile);
@@ -992,6 +1009,9 @@ function SettingsPage() {
   const saveProfile = () => {
     setProfile(draft);
     try { localStorage.setItem('netto:profile', JSON.stringify(draft)); } catch {}
+    if (window.supabaseClient && window.AppUser) {
+      window.supabaseClient.auth.updateUser({ data: { full_name: draft.name } });
+    }
     try { window.dispatchEvent(new Event('netto:profile-changed')); } catch {}
   };
   const revertProfile = () => setDraft(profile);
