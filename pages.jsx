@@ -1209,9 +1209,7 @@ function SettingsPage() {
         <ConnectedAppsManager lang={lang} draft={draft} updateDraft={updateDraft} />
       </SettingsSection>
 
-      <SettingsSection title={lang === 'th' ? 'ขั้นสูง' : 'Advanced'} desc={lang === 'th' ? 'ตั้งค่า API Key' : 'Configure external APIs'}>
-        <SecApiSettingsManager lang={lang} draft={draft} updateDraft={updateDraft} />
-      </SettingsSection>
+
 
       <SettingsSection title={lang === 'th' ? 'จัดการข้อมูล' : 'Data Management'}>
         <div className="flex items-center justify-between py-2">
