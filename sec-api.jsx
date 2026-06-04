@@ -60,20 +60,20 @@ class SecApi {
           }
         });
 
-        if (response.ok) {
+        if (response.status === 200) {
           const data = await response.json();
-          // The API returns an object or array. Usually object like { net_asset: ..., last_val: ... } or an array of records.
-          // Let's assume it's a single record object with last_val based on standard SEC API.
-          if (data && data.last_val) {
-            return {
-              price: data.last_val,
-              date: dateString
-            };
-          } else if (Array.isArray(data) && data.length > 0 && data[0].last_val) {
-            return {
-              price: data[0].last_val,
-              date: dateString
-            };
+          if (Array.isArray(data)) {
+             // Find specific class like SCBS&P500E
+             const specificClass = data.find(d => d.class_abbr_name === ticker);
+             if (specificClass && specificClass.last_val) {
+                return { price: specificClass.last_val, date: dateString };
+             }
+             // Fallback to the first one if ticker isn't exactly the class name
+             if (data.length > 0 && data[0].last_val) {
+                return { price: data[0].last_val, date: dateString };
+             }
+          } else if (data && data.last_val) {
+             return { price: data.last_val, date: dateString };
           }
         }
       } catch (e) {
