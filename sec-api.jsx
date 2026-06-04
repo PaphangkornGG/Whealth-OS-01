@@ -100,6 +100,24 @@ class SecApi {
         }
       }
 
+      // 5) Fallback: Strip parentheses suffixes (e.g. SCBEV(E) -> SCBEV)
+      if (!projData && searchTicker.includes('(')) {
+        let stripped = searchTicker.replace(/\([A-Z]\)/g, '');
+        if (this.fundMapping[stripped]) {
+          projData = this.fundMapping[stripped];
+        }
+      }
+      
+      // 6) Fallback: Strip E, A, D if it matches SCB or similar pattern (e.g. SCBCHAE -> SCBCHA)
+      if (!projData) {
+        let stripped = searchTicker.replace(/[EAD]$/, '');
+        if (this.fundMapping[stripped]) {
+          projData = this.fundMapping[stripped];
+        } else if (this.fundMapping[stripped + 'FUND']) {
+          projData = this.fundMapping[stripped + 'FUND'];
+        }
+      }
+
       projId = projData ? projData.id : null;
       projName = projData ? projData.name : null;
     }

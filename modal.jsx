@@ -235,9 +235,8 @@ function QuickTxModal({ open, onClose, onSave, prefill }) {
       try {
         const isCrypto = ['BTC','ETH','SOL','BNB','XRP','ADA','DOGE'].includes(upper);
         const isThai = COMMON_THAI_TICKERS.includes(upper);
-        const isFund = upper.includes('-') || upper.includes('&') || upper.startsWith('SCB') || upper.startsWith('K-') || upper.startsWith('KF') || upper.startsWith('KT') || upper.startsWith('TMB') || upper.startsWith('ONE') || upper.startsWith('ASP') || upper.startsWith('KKP');
         
-        if (isFund && window.SecApi && window.SecApi.isConfigured()) {
+        if (window.SecApi && window.SecApi.isConfigured()) {
           try {
             const navData = await window.SecApi.getLatestNAV(upper);
             if (navData && navData.price) {
@@ -250,7 +249,7 @@ function QuickTxModal({ open, onClose, onSave, prefill }) {
               return; // Successfully fetched from SEC API!
             }
           } catch (e) {
-            console.warn("SEC Fetch Error (Falling back):", e.message);
+            // Not a Thai fund or mapping not found, silently fall through to Yahoo
           }
         }
 
