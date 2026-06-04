@@ -1372,6 +1372,12 @@ function SettingsPage() {
               type="button"
               onClick={() => {
                 const nextVal = !useMockData;
+                if (nextVal) {
+                  const confirmMsg = lang === 'th'
+                    ? 'การโหลดข้อมูลจำลองจะแสดงข้อมูลพอร์ตโฟลิโอตัวอย่าง ข้อมูลที่คุณกรอกไว้จะไม่หายไป แต่จะถูกซ่อนไว้ชั่วคราว คุณแน่ใจหรือไม่ที่จะโหลดข้อมูลตัวอย่าง?'
+                    : 'Loading demo data will display a sample portfolio. Your entered data will not be lost but will be temporarily hidden. Are you sure you want to proceed?';
+                  if (!window.confirm(confirmMsg)) return;
+                }
                 localStorage.setItem('netto:useMockData', nextVal ? 'true' : 'false');
                 setUseMockData(nextVal);
                 window.location.reload();
