@@ -1058,7 +1058,7 @@ function SettingsPage() {
           twoFA: draft.twoFA,
           emailAlerts: draft.emailAlerts,
           pushAlerts: draft.pushAlerts,
-          useMockData: draft.useMockData,
+          useMockData: !!draft.useMockData,
           policyMode: draft.policyMode,
           classTargets: draft.classTargets,
           assetTargets: draft.assetTargets,
@@ -1072,6 +1072,10 @@ function SettingsPage() {
     // Also push updates to localStorage directly for immediate UI feedback elsewhere
     try {
       localStorage.setItem('netto:useMockData', draft.useMockData ? 'true' : 'false');
+      if (draft.useMockData !== (profile.useMockData === true)) {
+        window.location.reload();
+        return;
+      }
       if (draft.classTargets) {
         localStorage.setItem('netto:classTargets', JSON.stringify(draft.classTargets));
         window.DataLayer.TARGET = draft.classTargets;

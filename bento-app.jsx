@@ -868,16 +868,15 @@ function App() {
         // Hydrate preferences from Supabase to localStorage
         const meta = sessionUser.user_metadata;
         if (meta) {
-          if (meta.useMockData !== undefined) {
-            const currentMockStr = localStorage.getItem('netto:useMockData');
-            const newMockStr = meta.useMockData ? 'true' : 'false';
-            if (currentMockStr !== newMockStr) {
-              localStorage.setItem('netto:useMockData', newMockStr);
-              // Reload so that data.jsx and history.jsx can re-initialize properly 
-              // with or without the mock data seed.
-              window.location.reload();
-              return;
-            }
+          const syncedMock = meta.useMockData === true; // Treat undefined as false
+          const currentMockStr = localStorage.getItem('netto:useMockData');
+          const newMockStr = syncedMock ? 'true' : 'false';
+          if (currentMockStr !== newMockStr) {
+            localStorage.setItem('netto:useMockData', newMockStr);
+            // Reload so that data.jsx and history.jsx can re-initialize properly 
+            // with or without the mock data seed.
+            window.location.reload();
+            return;
           }
           if (meta.hiddenApps) {
             localStorage.setItem('netto:hiddenApps', JSON.stringify(meta.hiddenApps));
