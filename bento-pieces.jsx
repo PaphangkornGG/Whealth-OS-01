@@ -117,7 +117,7 @@ function BalanceCard() {
   // 30-day weighted change
   const startV = D.PORTFOLIO_SPARK[0];
   const endV = D.PORTFOLIO_SPARK[D.PORTFOLIO_SPARK.length - 1];
-  const monthPct = ((endV - startV) / startV) * 100;
+  const monthPct = startV > 0 ? ((endV - startV) / startV) * 100 : 0;
   const positive = monthPct >= 0;
 
   return (
@@ -257,8 +257,10 @@ function MiniHeatmap() {
     used += n;
   });
   // Adjust to fit exactly SLOTS
-  while (used > SLOTS) { const i = allocated.findIndex(x => x.n > 1); if (i < 0) break; allocated[i].n--; used--; }
-  while (used < SLOTS) { allocated[0].n++; used++; }
+  if (allocated.length > 0) {
+    while (used > SLOTS) { const i = allocated.findIndex(x => x.n > 1); if (i < 0) break; allocated[i].n--; used--; }
+    while (used < SLOTS) { allocated[0].n++; used++; }
+  }
 
   // Build flat list of cells
   const cells = [];
@@ -380,11 +382,12 @@ function PLCard() {
   const { lang } = window.useT();
   const unrealized = D.TOTAL_THB - D.TOTAL_COST_THB;
   const positive = unrealized >= 0;
-  const totalReturnPct = (unrealized / D.TOTAL_COST_THB) * 100;
+  const totalReturnPct = D.TOTAL_COST_THB > 0 ? (unrealized / D.TOTAL_COST_THB) * 100 : 0;
 
   // Build a P/L trend from the portfolio sparkline → daily portfolio value minus a constant cost basis.
   const spark = D.PORTFOLIO_SPARK;
-  const scale = D.TOTAL_THB / spark[spark.length - 1];
+  const endSpark = spark[spark.length - 1];
+  const scale = endSpark > 0 ? D.TOTAL_THB / endSpark : 0;
   const plSeries = spark.map(v => v * scale - D.TOTAL_COST_THB);
   const minP = Math.min(...plSeries), maxP = Math.max(...plSeries);
   const yRange = Math.max(maxP - minP, 1);
@@ -486,7 +489,7 @@ function DividendYTDCard() {
     .filter(a => (a.dividendsYTD || 0) > 0)
     .map(a => ({
       ticker: a.ticker,
-      cls: D.ASSET_CLASSES[a.cls],
+      cls: D.ASSET_CLASSES[a.cls] || { color: 'oklch(0.62 0.015 250)', label: a.cls || 'Other' },
       amountTHB: D.toTHB(a.dividendsYTD, a.ccy),
     }))
     .sort((a, b) => b.amountTHB - a.amountTHB)
