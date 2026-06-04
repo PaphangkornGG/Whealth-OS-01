@@ -1093,6 +1093,41 @@ function SettingsPage() {
           </div>
         </div>
       </SettingsSection>
+
+      {/* Danger Zone */}
+      <SettingsSection
+        title={lang === 'th' ? 'จัดการข้อมูล' : 'Data Management'}
+        desc={lang === 'th' ? 'ล้างข้อมูลธุรกรรมและประวัติทั้งหมด' : 'Delete all custom transaction history and reset data'}
+      >
+        <div className="bg-loss-soft/20 border border-loss/20 rounded-xl p-4 flex flex-col md:flex-row md:items-center justify-between gap-4">
+          <div className="space-y-1">
+            <h4 className="text-loss text-[13px] font-semibold flex items-center gap-1.5">
+              <Icon.Alert size={14}/>
+              {lang === 'th' ? 'ลบประวัติธุรกรรมทั้งหมด' : 'Clear All Transaction History'}
+            </h4>
+            <p className="text-ink-500 text-[12px] max-w-md">
+              {lang === 'th' 
+                ? 'การลบนี้จะล้างประวัติการทำรายการซื้อ/ขาย/ปันผลที่คุณบันทึกไว้ทั้งหมดจากเบราว์เซอร์นี้ และไม่สามารถกู้คืนได้' 
+                : 'This will delete all custom buy, sell, and dividend transactions you have logged on this browser. This action cannot be undone.'}
+            </p>
+          </div>
+          <button
+            type="button"
+            onClick={() => {
+              const confirmMsg = lang === 'th' 
+                ? 'คุณแน่ใจหรือไม่ที่จะลบประวัติธุรกรรมทั้งหมด? การกระทำนี้ไม่สามารถย้อนกลับได้' 
+                : 'Are you sure you want to delete all transaction history? This action is permanent and cannot be undone.';
+              if (window.confirm(confirmMsg)) {
+                localStorage.removeItem('netto:userTxs');
+                window.location.reload();
+              }
+            }}
+            className="px-4 py-2 bg-loss text-white text-[12px] font-semibold rounded-lg hover:bg-loss/90 transition-colors shadow-sm self-start md:self-auto cursor-pointer"
+          >
+            {lang === 'th' ? 'ล้างประวัติทั้งหมด' : 'Clear All History'}
+          </button>
+        </div>
+      </SettingsSection>
     </>
   );
 }
