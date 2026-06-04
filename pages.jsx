@@ -1220,7 +1220,7 @@ function SettingsPage() {
           <div className="text-sm font-medium text-ink-900">{lang === 'th' ? 'แสดงข้อมูลพอร์ตจำลอง (Demo)' : 'Demo Portfolio Data'}</div>
           <button 
             onClick={() => updateDraft({ useMockData: !draft.useMockData })}
-            className={`w-10 h-5 rounded-full relative transition-colors ${draft.useMockData ? 'bg-brand-500' : 'bg-ink-300'}`}
+            className={`w-10 h-5 rounded-full relative transition-colors ${draft.useMockData ? 'bg-brand' : 'bg-ink-300'}`}
           >
             <div className={`absolute top-0.5 w-4 h-4 rounded-full bg-white shadow-sm transition-transform ${draft.useMockData ? 'left-[22px]' : 'left-0.5'}`}></div>
           </button>
