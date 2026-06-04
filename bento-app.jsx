@@ -488,8 +488,8 @@ function LoginPortal({ onGuest, lang }) {
       return;
     }
 
-    if (!email.trim() || !password.trim()) {
-      setErrorMsg(lang === 'th' ? 'กรุณากรอกข้อมูลให้ครบถ้วน' : 'Please fill out all fields');
+    if (!email.trim() || !password.trim() || (authMode === 'signup' && !fullName.trim())) {
+      setErrorMsg(lang === 'th' ? 'กรุณาตรวจสอบข้อมูลให้ครบถ้วน' : 'Please fill out all required fields');
       return;
     }
 
@@ -499,6 +499,9 @@ function LoginPortal({ onGuest, lang }) {
         const { data, error } = await supabase.auth.signUp({
           email: email.trim(),
           password: password.trim(),
+          options: {
+            data: { full_name: fullName.trim() }
+          }
         });
         if (error) throw error;
         if (data.user && data.session === null) {
