@@ -823,8 +823,8 @@ function App() {
             id: t.id,
             date: new Date(t.date),
             type: t.type,
-            ticker: t.ticker,
-            name: t.name || t.ticker,
+            ticker: t.ticker || 'UNKNOWN',
+            name: t.name || t.ticker || 'UNKNOWN',
             cls: t.cls,
             broker: t.broker,
             units: t.units ? parseFloat(t.units) : null,
@@ -904,7 +904,7 @@ function App() {
           if (!Array.isArray(userTxs) || userTxs.length === 0) return;
           const D = window.DataLayer;
           const existingIds = new Set(D.TRANSACTIONS.map(t => t.id));
-          const fresh = userTxs.filter(t => !existingIds.has(t.id)).map(t => ({ ...t, date: new Date(t.date) }));
+          const fresh = userTxs.filter(t => !existingIds.has(t.id)).map(t => ({ ...t, date: new Date(t.date), ticker: t.ticker || 'UNKNOWN', name: t.name || t.ticker || 'UNKNOWN' }));
           if (fresh.length === 0) return;
           fresh.forEach(tx => {
             D.TRANSACTIONS.unshift(tx);
