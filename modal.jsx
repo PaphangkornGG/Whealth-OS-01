@@ -133,6 +133,7 @@ function QuickTxModal({ open, onClose, onSave, prefill }) {
   const [date, setDate] = React.useState(() => new Date().toISOString().slice(0, 10));
   const [showSuggest, setShowSuggest] = React.useState(false);
   const [priceSynced, setPriceSynced] = React.useState(false);
+  const [navDate, setNavDate] = React.useState(null);
   // Dividend WHT (withholding tax). Mode 'auto' uses the class-default rate,
   // 'none' explicitly zeros it (e.g. BOI-exempt dividends), 'custom' lets the
   // user type the exact baht/dollar amount that was withheld.
@@ -245,6 +246,7 @@ function QuickTxModal({ open, onClose, onSave, prefill }) {
               setName(navData.name || upper);
               setCcy('THB');
               setCls('fund');
+              setNavDate(navData.date);
               return; // Successfully fetched from SEC API!
             }
           } catch (e) {
@@ -252,6 +254,7 @@ function QuickTxModal({ open, onClose, onSave, prefill }) {
           }
         }
 
+        setNavDate(null);
         let primaryTicker = upper;
         let secondaryTicker = null;
         
@@ -1031,7 +1034,7 @@ function QuickTxModal({ open, onClose, onSave, prefill }) {
                       </span>
                     )}
                   </div>
-                  {livePrice && (
+                  {livePrice && !navDate && (
                     <div className="mt-1.5 flex items-center gap-1.5 text-[10px] text-ink-500 num">
                       <span className="w-1.5 h-1.5 rounded-full bg-gain animate-pulse"></span>
                       <span>{t.livePrice}</span>
@@ -1040,6 +1043,14 @@ function QuickTxModal({ open, onClose, onSave, prefill }) {
                       </span>
                       <span className="text-ink-400">·</span>
                       <span>15-min delayed</span>
+                    </div>
+                  )}
+                  {navDate && (
+                    <div className="mt-1.5 flex items-center gap-1.5 text-[10px] text-ink-500 num">
+                      <span className="w-1.5 h-1.5 rounded-full bg-blue-500"></span>
+                      <span>SEC API NAV</span>
+                      <span className="text-ink-400">·</span>
+                      <span>As of {navDate}</span>
                     </div>
                   )}
                 </Field>
