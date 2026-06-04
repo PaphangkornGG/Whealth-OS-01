@@ -46,7 +46,22 @@ class SecApi {
     }
 
     await this.ensureMapping();
-    const projData = this.fundMapping[ticker.toUpperCase().trim()];
+    let searchTicker = ticker.toUpperCase().trim();
+    let projData = this.fundMapping[searchTicker];
+    
+    // Fallback: If not found, it might be a share class (e.g. UGIS-N).
+    // Try stripping suffixes after the last hyphen incrementally.
+    if (!projData && searchTicker.includes('-')) {
+      const parts = searchTicker.split('-');
+      for (let i = parts.length - 1; i > 0; i--) {
+        const fallbackTicker = parts.slice(0, i).join('-');
+        if (this.fundMapping[fallbackTicker]) {
+          projData = this.fundMapping[fallbackTicker];
+          break;
+        }
+      }
+    }
+
     const projId = projData ? projData.id : null;
     
     if (!projId) {
