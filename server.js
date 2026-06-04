@@ -65,7 +65,37 @@ const server = http.createServer(async (req, res) => {
     }
   }
 
-  // 2) Static Files Server
+  // 2) API Route: SEC API Proxy (to bypass CORS)
+  if (pathname.startsWith('/api/sec')) {
+    const projId = parsedUrl.query.projId;
+    const dateString = parsedUrl.query.dateString;
+    if (!projId || !dateString) {
+      res.writeHead(400, { 'Content-Type': 'application/json', 'Access-Control-Allow-Origin': '*' });
+      return res.end(JSON.stringify({ error: 'projId and dateString are required' }));
+    }
+
+    try {
+      const response = await fetch(`https://api.sec.or.th/FundDailyInfo/${projId}/dailynav/${dateString}`, {
+        headers: { 'Ocp-Apim-Subscription-Key': '4a07e3a20ba74b71963123b4de0fa965' }
+      });
+      if (response.status === 204) {
+         res.writeHead(204, { 'Access-Control-Allow-Origin': '*' });
+         return res.end();
+      }
+      if (!response.ok) {
+        res.writeHead(response.status, { 'Content-Type': 'application/json', 'Access-Control-Allow-Origin': '*' });
+        return res.end(JSON.stringify({ error: `SEC API returned status ${response.status}` }));
+      }
+      const data = await response.json();
+      res.writeHead(200, { 'Content-Type': 'application/json', 'Access-Control-Allow-Origin': '*' });
+      return res.end(JSON.stringify(data));
+    } catch (error) {
+      res.writeHead(500, { 'Content-Type': 'application/json', 'Access-Control-Allow-Origin': '*' });
+      return res.end(JSON.stringify({ error: error.message }));
+    }
+  }
+
+  // 3) Static Files Server
   if (pathname === '/') {
     pathname = '/index.html';
   }

@@ -118,14 +118,10 @@ class SecApi {
       const d = new Date(today);
       d.setDate(d.getDate() - i);
       const dateString = d.toISOString().split('T')[0];
-      const url = `${SEC_API_URL.DAILY_INFO}/${projId}/dailynav/${dateString}`;
+      const url = `/api/sec?projId=${projId}&dateString=${dateString}`;
       
       try {
-        const response = await fetch(url, {
-          headers: {
-            'Ocp-Apim-Subscription-Key': this.dailyInfoKey
-          }
-        });
+        const response = await fetch(url);
 
         if (response.status === 200) {
           const data = await response.json();
