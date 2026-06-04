@@ -136,6 +136,8 @@ function QuickTxModal({ open, onClose, onSave, prefill }) {
   // user type the exact baht/dollar amount that was withheld.
   const [whtMode, setWhtMode] = React.useState('auto');
   const [whtCustom, setWhtCustom] = React.useState('');
+  const [overridden, setOverridden] = React.useState(false);
+  const [showClassSelector, setShowClassSelector] = React.useState(false);
   const tickerRef = React.useRef(null);
 
   React.useEffect(() => {
@@ -154,6 +156,8 @@ function QuickTxModal({ open, onClose, onSave, prefill }) {
       setPriceSynced(false);
       setWhtMode('auto');
       setWhtCustom('');
+      setOverridden(false);
+      setShowClassSelector(false);
       
       // Default guess to USD / US stock
       setCcy('USD');
@@ -187,8 +191,10 @@ function QuickTxModal({ open, onClose, onSave, prefill }) {
     const lp = getLivePrice(upper);
     if (lp) {
       setName(lp.name || lp.ticker || '');
-      if (lp.ccy) setCcy(lp.ccy);
-      if (lp.cls) setCls(lp.cls);
+      if (!overridden) {
+        if (lp.ccy) setCcy(lp.ccy);
+        if (lp.cls) setCls(lp.cls);
+      }
       if (type !== 'dividend') {
         setPrice(String(lp.price));
         setPriceSynced(true);
@@ -197,16 +203,18 @@ function QuickTxModal({ open, onClose, onSave, prefill }) {
     }
 
     // Set initial logical guesses before network request returns
-    const isCrypto = ['BTC','ETH','SOL','BNB','XRP','ADA','DOGE'].includes(upper);
-    if (isCrypto) {
-      setCcy('USD');
-      setCls('crypto');
-    } else if (/^[A-Z]{1,5}$/.test(upper)) {
-      setCcy('USD');
-      setCls('us');
-    } else {
-      setCcy('THB');
-      setCls('th');
+    if (!overridden) {
+      const isCrypto = ['BTC','ETH','SOL','BNB','XRP','ADA','DOGE'].includes(upper);
+      if (isCrypto) {
+        setCcy('USD');
+        setCls('crypto');
+      } else if (/^[A-Z]{1,5}$/.test(upper)) {
+        setCcy('USD');
+        setCls('us');
+      } else {
+        setCcy('THB');
+        setCls('th');
+      }
     }
 
     // 2) Perform debounced fetch from Yahoo Finance proxy server
@@ -235,7 +243,7 @@ function QuickTxModal({ open, onClose, onSave, prefill }) {
             if (data.name) setName(data.name);
             
             // Sync currency and class from Yahoo Finance response
-            if (data.currency) {
+            if (!overridden && data.currency) {
               setCcy(data.currency);
               if (data.currency === 'THB') {
                 setCls('th');
@@ -255,7 +263,7 @@ function QuickTxModal({ open, onClose, onSave, prefill }) {
               setPriceSynced(true);
               if (data2.name) setName(data2.name);
               
-              if (data2.currency) {
+              if (!overridden && data2.currency) {
                 setCcy(data2.currency);
                 if (data2.currency === 'THB') {
                   setCls('th');
@@ -275,7 +283,7 @@ function QuickTxModal({ open, onClose, onSave, prefill }) {
       clearTimeout(timeout);
       controller.abort();
     };
-  }, [ticker, open]);
+  }, [ticker, open, overridden]);
 
   React.useEffect(() => {
     if (!open) return;
@@ -365,6 +373,22 @@ function QuickTxModal({ open, onClose, onSave, prefill }) {
     ? TICKER_SUGGESTIONS.filter(s => s.t.toLowerCase().includes(ticker.toLowerCase()) || s.n.toLowerCase().includes(ticker.toLowerCase()))
     : TICKER_SUGGESTIONS.slice(0, 6);
 
+  function handleClassChange(newCls) {
+    setCls(newCls);
+    setOverridden(true);
+    // Auto-update currency for common defaults
+    if (newCls === 'us' || newCls === 'crypto') {
+      setCcy('USD');
+    } else if (newCls === 'th' || newCls === 'fund' || newCls === 'cash') {
+      setCcy('THB');
+    }
+  }
+
+  function handleCcyChange(newCcy) {
+    setCcy(newCcy);
+    setOverridden(true);
+  }
+
   function syncPrice() {
     if (!livePrice) return;
     setPrice(String(livePrice.price));
@@ -378,6 +402,7 @@ function QuickTxModal({ open, onClose, onSave, prefill }) {
     setTicker(s.t);
     setName(s.n);
     setShowSuggest(false);
+    setOverridden(false);
     const lp = getLivePrice(s.t);
     if (lp && type !== 'dividend') {
       setPrice(String(lp.price));
@@ -480,7 +505,12 @@ function QuickTxModal({ open, onClose, onSave, prefill }) {
                   ref={tickerRef}
                   type="text"
                   value={ticker}
-                  onChange={(e) => { setTicker(e.target.value.toUpperCase()); setShowSuggest(true); setPriceSynced(false); }}
+                  onChange={(e) => { 
+                    setTicker(e.target.value.toUpperCase()); 
+                    setShowSuggest(true); 
+                    setPriceSynced(false); 
+                    setOverridden(false); 
+                  }}
                   onFocus={() => setShowSuggest(true)}
                   onBlur={() => setTimeout(() => setShowSuggest(false), 120)}
                   placeholder={t.tickerPlaceholder}
@@ -515,27 +545,116 @@ function QuickTxModal({ open, onClose, onSave, prefill }) {
                   </div>
                 )}
               </div>
-              {ticker.trim() && cls && (
-                <div className="mt-2 flex items-center gap-1.5">
-                  <span className="text-[11px] text-ink-500 font-medium">
-                    {window.localStorage.getItem('wealthos_lang') === 'th' ? 'ประเภทสินทรัพย์:' : 'Asset Class:'}
-                  </span>
-                  <span
-                    className="inline-flex items-center gap-1 px-2 py-0.5 rounded text-[11px] font-semibold border"
-                    style={{
-                      color: window.DataLayer.ASSET_CLASSES[cls]?.color || 'oklch(0.55 0.22 264)',
-                      borderColor: `color-mix(in oklch, ${window.DataLayer.ASSET_CLASSES[cls]?.color || 'oklch(0.55 0.22 264)'} 30%, transparent)`,
-                      background: `color-mix(in oklch, ${window.DataLayer.ASSET_CLASSES[cls]?.color || 'oklch(0.55 0.22 264)'} 10%, transparent)`
-                    }}
+              {ticker.trim() && cls && !showClassSelector && (
+                <div className="mt-2.5 flex items-center justify-between">
+                  <div className="flex items-center gap-1.5">
+                    <span className="text-[11px] text-ink-500 font-medium">
+                      {window.localStorage.getItem('wealthos_lang') === 'th' ? 'ประเภทสินทรัพย์:' : 'Asset Class:'}
+                    </span>
+                    <span
+                      className="inline-flex items-center gap-1 px-2 py-0.5 rounded text-[11px] font-semibold border"
+                      style={{
+                        color: window.DataLayer.ASSET_CLASSES[cls]?.color || 'oklch(0.55 0.22 264)',
+                        borderColor: `color-mix(in oklch, ${window.DataLayer.ASSET_CLASSES[cls]?.color || 'oklch(0.55 0.22 264)'} 30%, transparent)`,
+                        background: `color-mix(in oklch, ${window.DataLayer.ASSET_CLASSES[cls]?.color || 'oklch(0.55 0.22 264)'} 10%, transparent)`
+                      }}
+                    >
+                      {cls === 'us' && <Icon.Globe size={11}/>}
+                      {cls === 'th' && <Icon.Building size={11}/>}
+                      {cls === 'fund' && <Icon.PieChart size={11}/>}
+                      {cls === 'gold' && <Icon.Coins size={11}/>}
+                      {cls === 'crypto' && <Icon.Bitcoin size={11}/>}
+                      {cls === 'cash' && <Icon.Banknote size={11}/>}
+                      {t.classes[cls] || cls}
+                    </span>
+                    <span className="text-[11px] text-ink-400">·</span>
+                    <span className="text-[11px] font-semibold text-ink-700 uppercase bg-ink-200 px-1.5 py-0.5 rounded border border-ink-300">
+                      {ccy}
+                    </span>
+                  </div>
+                  <button
+                    type="button"
+                    onClick={() => setShowClassSelector(true)}
+                    className="text-[11.5px] font-semibold text-brand hover:underline flex items-center gap-0.5"
                   >
-                    {cls === 'us' && <Icon.Globe size={11}/>}
-                    {cls === 'th' && <Icon.Building size={11}/>}
-                    {cls === 'fund' && <Icon.PieChart size={11}/>}
-                    {cls === 'gold' && <Icon.Coins size={11}/>}
-                    {cls === 'crypto' && <Icon.Bitcoin size={11}/>}
-                    {cls === 'cash' && <Icon.Banknote size={11}/>}
-                    {t.classes[cls] || cls}
-                  </span>
+                    <Icon.Settings size={11}/>
+                    {window.localStorage.getItem('wealthos_lang') === 'th' ? 'แก้ไข' : 'Change'}
+                  </button>
+                </div>
+              )}
+              {ticker.trim() && cls && showClassSelector && (
+                <div className="mt-3 bg-ink-100/60 border border-ink-200 rounded-xl p-3.5 space-y-3.5 fade-in">
+                  <div className="flex items-center justify-between">
+                    <span className="text-[11px] uppercase tracking-wider text-ink-600 font-semibold">
+                      {window.localStorage.getItem('wealthos_lang') === 'th' ? 'กําหนดประเภทสินทรัพย์เอง' : 'Customize Asset Class'}
+                    </span>
+                    <button
+                      type="button"
+                      onClick={() => setShowClassSelector(false)}
+                      className="text-[11.5px] font-semibold text-brand hover:underline"
+                    >
+                      {window.localStorage.getItem('wealthos_lang') === 'th' ? 'เสร็จสิ้น' : 'Done'}
+                    </button>
+                  </div>
+                  
+                  {/* Class Grid */}
+                  <div className="space-y-1.5">
+                    <div className="text-[10px] text-ink-500 uppercase tracking-wider font-semibold">
+                      {window.localStorage.getItem('wealthos_lang') === 'th' ? 'เลือกประเภท' : 'Select Class'}
+                    </div>
+                    <div className="grid grid-cols-3 gap-1.5">
+                      {Object.keys(window.DataLayer.ASSET_CLASSES).map(classId => {
+                        const classData = window.DataLayer.ASSET_CLASSES[classId];
+                        const isActive = cls === classId;
+                        return (
+                          <button
+                            key={classId}
+                            type="button"
+                            onClick={() => handleClassChange(classId)}
+                            className={`flex items-center justify-center gap-1 py-1.5 px-2 rounded-lg text-[11px] font-medium transition-all border ${
+                              isActive
+                                ? 'bg-ink-0 text-ink-900 border-brand shadow-sm font-semibold'
+                                : 'bg-ink-50 text-ink-600 border-ink-200 hover:text-ink-800 hover:border-ink-300'
+                            }`}
+                          >
+                            {classId === 'us' && <Icon.Globe size={10} style={{ color: classData.color }}/>}
+                            {classId === 'th' && <Icon.Building size={10} style={{ color: classData.color }}/>}
+                            {classId === 'fund' && <Icon.PieChart size={10} style={{ color: classData.color }}/>}
+                            {classId === 'gold' && <Icon.Coins size={10} style={{ color: classData.color }}/>}
+                            {classId === 'crypto' && <Icon.Bitcoin size={10} style={{ color: classData.color }}/>}
+                            {classId === 'cash' && <Icon.Banknote size={10} style={{ color: classData.color }}/>}
+                            <span className="truncate">{t.classesShort[classId] || classData.label}</span>
+                          </button>
+                        );
+                      })}
+                    </div>
+                  </div>
+
+                  {/* Currency Grid */}
+                  <div className="space-y-1.5">
+                    <div className="text-[10px] text-ink-500 uppercase tracking-wider font-semibold">
+                      {window.localStorage.getItem('wealthos_lang') === 'th' ? 'เลือกสกุลเงิน' : 'Select Currency'}
+                    </div>
+                    <div className="grid grid-cols-2 gap-1.5">
+                      {['THB', 'USD'].map(ccyOption => {
+                        const isActive = ccy === ccyOption;
+                        return (
+                          <button
+                            key={ccyOption}
+                            type="button"
+                            onClick={() => handleCcyChange(ccyOption)}
+                            className={`py-1.5 px-2 rounded-lg text-[11px] font-semibold transition-all border text-center ${
+                              isActive
+                                ? 'bg-ink-0 text-ink-900 border-brand shadow-sm'
+                                : 'bg-ink-50 text-ink-600 border-ink-200 hover:text-ink-800'
+                            }`}
+                          >
+                            {ccyOption} ({ccyOption === 'THB' ? '฿' : '$'})
+                          </button>
+                        );
+                      })}
+                    </div>
+                  </div>
                 </div>
               )}
             </Field>
