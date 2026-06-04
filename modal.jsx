@@ -1114,6 +1114,9 @@ function QuickTxModal({ open, onClose, onSave, prefill }) {
 
 function BrokerBadge({ broker, size=22 }) {
   const s = `${size}px`;
+  if (!broker) {
+    return <span className="rounded-md shrink-0 bg-ink-200 border border-ink-300" style={{ width: s, height: s }}></span>;
+  }
   // If a logo image is available, render it inside a rounded tile coloured to the brand.
   if (broker.logo) {
     return (
