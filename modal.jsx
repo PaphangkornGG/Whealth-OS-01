@@ -43,25 +43,7 @@ function getLivePrice(tickerInput) {
     'SCB':    { price: 110.00, ccy: 'THB' },
     'BBL':    { price: 158.50, ccy: 'THB' },
     'ADVANC': { price: 287.00, ccy: 'THB' },
-    // Thai mutual funds (NAV)
-    'SCBS&P500E':    { price: 44.1545, ccy: 'THB', broker: 'scb_am' },
-    'SCBS&P500':     { price: 19.8420, ccy: 'THB', broker: 'scb_am' },
-    'SCBGOLDH':      { price: 14.8210, ccy: 'THB', broker: 'scb_am' },
-    'SCBCHEQA':      { price: 8.6240,  ccy: 'THB', broker: 'scb_am' },
-    'K-USXNDQ-A(A)': { price: 17.2840, ccy: 'THB', broker: 'kasset' },
-    'K-CHINA-A':     { price: 9.4520,  ccy: 'THB', broker: 'kasset' },
-    'K-VIETNAM':     { price: 11.6240, ccy: 'THB', broker: 'kasset' },
-    'K-FIXED':       { price: 12.0480, ccy: 'THB', broker: 'kasset' },
-    'KFLTGOVRMF':    { price: 13.4150, ccy: 'THB', broker: 'finnomena' },
-    'KFHTECH-A':     { price: 11.8420, ccy: 'THB', broker: 'finnomena' },
-    'KT-WTAI':       { price: 14.2810, ccy: 'THB', broker: 'ktam' },
-    'B-INNOTECH':    { price: 16.4820, ccy: 'THB', broker: 'bbl_am' },
-    'ONE-UGG':       { price: 18.6240, ccy: 'THB', broker: 'finnomena' },
-    'TMBGQG':        { price: 13.2420, ccy: 'THB', broker: 'finnomena' },
-    'M-S50':         { price: 24.8420, ccy: 'THB', broker: 'finnomena' },
-    'ASP-DIGIBLOC':  { price: 12.5042, ccy: 'THB', broker: 'finnomena' },
-    'ASP-NGF':       { price: 33.325, ccy: 'THB', name: 'Asset Plus Nippon Growth Fund (ASP-NGF)', cls: 'fund' },
-    'KKP S-PLUS':    { price: 10.8886, ccy: 'THB', name: 'KKP Smart Plus Fund', cls: 'fund' },
+    // Thai mutual funds (NAV) are now fetched live via SEC API
     // Crypto
     'SOL':  { price: 168.40, ccy: 'USD', broker: 'bitkub' },
     'BNB':  { price: 632.20, ccy: 'USD', broker: 'binance_th' },
@@ -252,7 +234,24 @@ function QuickTxModal({ open, onClose, onSave, prefill }) {
       try {
         const isCrypto = ['BTC','ETH','SOL','BNB','XRP','ADA','DOGE'].includes(upper);
         const isThai = COMMON_THAI_TICKERS.includes(upper);
+        const isFund = upper.includes('-') || upper.includes('&') || upper.startsWith('SCB') || upper.startsWith('K-') || upper.startsWith('KF') || upper.startsWith('KT') || upper.startsWith('TMB') || upper.startsWith('ONE') || upper.startsWith('ASP') || upper.startsWith('KKP');
         
+        if (isFund && window.SecApi && window.SecApi.isConfigured()) {
+          try {
+            const navData = await window.SecApi.getLatestNAV(upper);
+            if (navData && navData.price) {
+              setPrice(String(navData.price));
+              setPriceSynced(true);
+              setName(navData.name || upper);
+              setCcy('THB');
+              setCls('fund');
+              return; // Successfully fetched from SEC API!
+            }
+          } catch (e) {
+            console.warn("SEC Fetch Error (Falling back):", e.message);
+          }
+        }
+
         let primaryTicker = upper;
         let secondaryTicker = null;
         

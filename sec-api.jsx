@@ -5,20 +5,27 @@ const SEC_API_URL = {
   FACTSHEET: 'https://api.sec.or.th/FundFactsheet'
 };
 
-// We create a static mapping for the funds currently supported by Wealth OS
-// to save on expensive AMC and profile fetching loops.
-// This can be expanded later or made dynamic.
-const FUND_MAPPING = {
-  'SCBS&P500E': 'M0643_2555',
-  'SCBS&P500': 'M0643_2555',
-  'SCBPGF': 'M0101_2557',     // Example, needs real mapping if heavily used
-  'SCBGOLDH': 'M0502_2554',   // Example, needs real mapping if heavily used
-};
-
 class SecApi {
   constructor() {
     this.dailyInfoKey = localStorage.getItem('sec:dailyInfoKey') || '4a07e3a20ba74b71963123b4de0fa965';
     this.factsheetKey = localStorage.getItem('sec:factsheetKey') || '23137ce0651f408697a6d2ddbdb5cf14';
+    this.fundMapping = null;
+  }
+
+  async ensureMapping() {
+    if (!this.fundMapping) {
+      try {
+        const res = await fetch('/sec_mapping.json');
+        if (res.ok) {
+          this.fundMapping = await res.json();
+        } else {
+          this.fundMapping = {};
+        }
+      } catch (e) {
+        console.error("Failed to load SEC mapping", e);
+        this.fundMapping = {};
+      }
+    }
   }
 
   isConfigured() {
@@ -38,7 +45,10 @@ class SecApi {
       throw new Error('SEC API is not configured. Please enter your API keys in Settings.');
     }
 
-    const projId = FUND_MAPPING[ticker];
+    await this.ensureMapping();
+    const projData = this.fundMapping[ticker.toUpperCase().trim()];
+    const projId = projData ? projData.id : null;
+    
     if (!projId) {
       throw new Error(`Mapping not found for ticker: ${ticker}`);
     }
@@ -65,15 +75,15 @@ class SecApi {
           if (Array.isArray(data)) {
              // Find specific class like SCBS&P500E
              const specificClass = data.find(d => d.class_abbr_name === ticker);
-             if (specificClass && specificClass.last_val) {
-                return { price: specificClass.last_val, date: dateString };
+             if (specificClass) {
+                return { price: specificClass.last_val, date: dateString, name: projData.name };
              }
              // Fallback to the first one if ticker isn't exactly the class name
-             if (data.length > 0 && data[0].last_val) {
-                return { price: data[0].last_val, date: dateString };
+             if (data.length > 0) {
+                return { price: data[0].last_val, date: dateString, name: projData.name };
              }
           } else if (data && data.last_val) {
-             return { price: data.last_val, date: dateString };
+             return { price: data.last_val, date: dateString, name: projData.name };
           }
         }
       } catch (e) {
