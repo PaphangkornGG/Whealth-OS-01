@@ -154,7 +154,7 @@ class SecApi {
     if (validResults.length > 0) {
       const { data, dateString } = validResults[0];
       if (Array.isArray(data)) {
-        const specificClass = data.find(d => d.class_abbr_name === ticker);
+        const specificClass = data.find(d => d.class_abbr_name === searchTicker);
         if (specificClass) {
           return { price: specificClass.last_val, date: dateString, name: projName };
         }
