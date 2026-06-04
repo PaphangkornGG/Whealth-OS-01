@@ -44,7 +44,7 @@ function getLivePrice(tickerInput) {
     'BBL':    { price: 158.50, ccy: 'THB' },
     'ADVANC': { price: 287.00, ccy: 'THB' },
     // Thai mutual funds (NAV)
-    'SCBS&P500E':    { price: 26.4521, ccy: 'THB', broker: 'scb_am' },
+    'SCBS&P500E':    { price: 44.1545, ccy: 'THB', broker: 'scb_am' },
     'SCBS&P500':     { price: 19.8420, ccy: 'THB', broker: 'scb_am' },
     'SCBGOLDH':      { price: 14.8210, ccy: 'THB', broker: 'scb_am' },
     'SCBCHEQA':      { price: 8.6240,  ccy: 'THB', broker: 'scb_am' },

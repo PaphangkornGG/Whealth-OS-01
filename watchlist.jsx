@@ -6,7 +6,7 @@ const WATCHLIST_SEED = [
   { ticker: 'META',         name: 'Meta Platforms',             cls: 'us',     ccy: 'USD', price: 588.10,  prev: 597.00,   target: 650,    seed: 47 },
   { ticker: 'AMD',          name: 'Advanced Micro Devices',     cls: 'us',     ccy: 'USD', price: 162.80,  prev: 158.40,   target: 200,    seed: 56 },
   { ticker: 'AOT',          name: 'Airports of Thailand',       cls: 'th',     ccy: 'THB', price: 64.25,   prev: 63.75,    target: 75,     seed: 99 },
-  { ticker: 'SCBS&P500E',   name: 'SCB S&P 500 Index',          cls: 'fund',   ccy: 'THB', price: 26.45,   prev: 26.31,    target: 30,     seed: 31 },
+  { ticker: 'SCBS&P500E',   name: 'SCB S&P 500 Index',          cls: 'fund',   ccy: 'THB', price: 44.15,   prev: 44.01,    target: 30,     seed: 31 },
   { ticker: 'SOL',          name: 'Solana',                     cls: 'crypto', ccy: 'USD', price: 168.40,  prev: 161.20,   target: 250,    seed: 12 },
 ];
 
