@@ -117,16 +117,144 @@ window.GoalsStore = { getAllGoals, addGoal, updateGoal, removeGoal, restoreBuilt
 
 function useGoals() {
   const [goals, setGoals] = React.useState(getAllGoals);
+  const [loading, setLoading] = React.useState(false);
+
+  const fetchGoals = async () => {
+    const supabase = window.supabaseClient;
+    if (!supabase) {
+      setGoals(getAllGoals());
+      return;
+    }
+    const { data: { session } } = await supabase.auth.getSession();
+    const user = session?.user;
+    if (user) {
+      setLoading(true);
+      const { data, error } = await supabase
+        .from('goals')
+        .select('*')
+        .order('created_at', { ascending: true });
+      if (!error && data) {
+        const formatted = data.map(g => ({
+          id: g.id,
+          label: { en: g.name, th: g.name },
+          target: parseFloat(g.target_amount),
+          currentTHB: 0,
+          etaYear: g.eta_year,
+          icon: g.icon,
+          accent: g.accent,
+          linkedBrokers: g.linked_brokers || [],
+          manualTHB: parseFloat(g.manual_thb || 0),
+        })).map(g => ({ ...g, currentTHB: computeCurrent(g) }));
+        setGoals(formatted);
+      }
+      setLoading(false);
+    } else {
+      setGoals(getAllGoals());
+    }
+  };
+
   React.useEffect(() => {
-    const onChange = () => setGoals(getAllGoals());
+    fetchGoals();
+    const onChange = () => fetchGoals();
     window.addEventListener('netto:goals-changed', onChange);
     window.addEventListener('storage', onChange);
+    window.addEventListener('netto:user-changed', onChange);
+
+    const { data: { subscription } } = window.supabaseClient?.auth.onAuthStateChange(() => {
+      fetchGoals();
+    }) || { data: { subscription: { unsubscribe: () => {} } } };
+
     return () => {
       window.removeEventListener('netto:goals-changed', onChange);
       window.removeEventListener('storage', onChange);
+      window.removeEventListener('netto:user-changed', onChange);
+      subscription.unsubscribe();
     };
   }, []);
-  return { goals, addGoal, updateGoal, removeGoal, restoreBuiltin };
+
+  const addGoalAsync = async (goal) => {
+    const supabase = window.supabaseClient;
+    if (!supabase) {
+      addGoal(goal);
+      return;
+    }
+    const { data: { session } } = await supabase.auth.getSession();
+    const user = session?.user;
+    if (user) {
+      const { error } = await supabase
+        .from('goals')
+        .insert({
+          user_id: user.id,
+          name: typeof goal.label === 'object' ? (goal.label.th || goal.label.en) : goal.label,
+          target_amount: goal.target,
+          eta_year: goal.etaYear,
+          icon: goal.icon,
+          accent: goal.accent,
+          linked_brokers: goal.linkedBrokers || [],
+          manual_thb: goal.manualTHB || 0,
+        });
+      if (!error) {
+        window.dispatchEvent(new Event('netto:goals-changed'));
+      }
+    } else {
+      addGoal(goal);
+    }
+  };
+
+  const updateGoalAsync = async (id, patch) => {
+    const supabase = window.supabaseClient;
+    if (!supabase) {
+      updateGoal(id, patch);
+      return;
+    }
+    const { data: { session } } = await supabase.auth.getSession();
+    const user = session?.user;
+    const isUUID = /^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i.test(id);
+    if (user && isUUID) {
+      const updatePayload = {};
+      if (patch.label !== undefined) updatePayload.name = typeof patch.label === 'object' ? (patch.label.th || patch.label.en) : patch.label;
+      if (patch.target !== undefined) updatePayload.target_amount = patch.target;
+      if (patch.etaYear !== undefined) updatePayload.eta_year = patch.etaYear;
+      if (patch.icon !== undefined) updatePayload.icon = patch.icon;
+      if (patch.accent !== undefined) updatePayload.accent = patch.accent;
+      if (patch.linkedBrokers !== undefined) updatePayload.linked_brokers = patch.linkedBrokers;
+      if (patch.manualTHB !== undefined) updatePayload.manual_thb = patch.manualTHB;
+
+      const { error } = await supabase
+        .from('goals')
+        .update(updatePayload)
+        .eq('id', id);
+      if (!error) {
+        window.dispatchEvent(new Event('netto:goals-changed'));
+      }
+    } else {
+      updateGoal(id, patch);
+    }
+  };
+
+  const removeGoalAsync = async (id) => {
+    const supabase = window.supabaseClient;
+    if (!supabase) {
+      removeGoal(id);
+      return;
+    }
+    const { data: { session } } = await supabase.auth.getSession();
+    const user = session?.user;
+    const isUUID = /^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i.test(id);
+    if (user && isUUID) {
+      const { error } = await supabase
+        .from('goals')
+        .delete()
+        .eq('id', id);
+      if (!error) {
+        window.dispatchEvent(new Event('netto:goals-changed'));
+      }
+    } else {
+      removeGoal(id);
+    }
+  };
+
+  return { goals, addGoal: addGoalAsync, updateGoal: updateGoalAsync, removeGoal: removeGoalAsync, restoreBuiltin, loading };
 }
 window.useGoals = useGoals;
 

@@ -59,7 +59,7 @@ const sparkSeries = (seed, n, drift) => {
   return out;
 };
 
-const PORTFOLIO = [
+const PORTFOLIO_SEED = [
   {
     ticker: 'GOOGL', name: 'Alphabet Inc.', cls: 'us', ccy: 'USD', broker: 'dime',
     units: 28, avgCost: 142.30, price: 184.22, feesLifetime: 4.10,
@@ -153,6 +153,8 @@ const PORTFOLIO = [
   },
 ];
 
+const PORTFOLIO = (typeof localStorage !== 'undefined' && localStorage.getItem('netto:useMockData') === 'false') ? [] : PORTFOLIO_SEED;
+
 // Derived helpers
 function toTHB(amount, ccy) {
   if (ccy === 'THB') return amount;
@@ -164,11 +166,13 @@ function enrich(a) {
   const value = a.units * a.price;
   const cost = a.units * a.avgCost;
   const unrealized = value - cost;
-  const unrealizedPct = (unrealized / cost) * 100;
+  const unrealizedPct = cost > 0 ? (unrealized / cost) * 100 : 0;
   const totalReturn = unrealized + a.dividendsLifetime;
-  const totalReturnPct = (totalReturn / cost) * 100;
+  const totalReturnPct = cost > 0 ? (totalReturn / cost) * 100 : 0;
   const valueTHB = toTHB(value, a.ccy);
-  const dayChangePct = (a.spark[a.spark.length-1] - a.spark[a.spark.length-2]) / a.spark[a.spark.length-2] * 100;
+  const dayChangePct = a.spark && a.spark.length >= 2 && a.spark[a.spark.length-2] > 0
+    ? (a.spark[a.spark.length-1] - a.spark[a.spark.length-2]) / a.spark[a.spark.length-2] * 100
+    : 0;
   return { ...a, value, cost, unrealized, unrealizedPct, totalReturn, totalReturnPct, valueTHB, dayChangePct };
 }
 
@@ -177,21 +181,21 @@ const TOTAL_THB = ENRICHED.reduce((s,a) => s + a.valueTHB, 0);
 const TOTAL_COST_THB = ENRICHED.reduce((s,a) => s + toTHB(a.cost, a.ccy), 0);
 const TOTAL_DIVS_YTD_THB = ENRICHED.reduce((s,a) => s + toTHB(a.dividendsYTD, a.ccy), 0);
 const TOTAL_DIVS_LIFE_THB = ENRICHED.reduce((s,a) => s + toTHB(a.dividendsLifetime, a.ccy), 0);
-const TRUE_RETURN_PCT = ((TOTAL_THB - TOTAL_COST_THB + TOTAL_DIVS_LIFE_THB) / TOTAL_COST_THB) * 100;
+const TRUE_RETURN_PCT = TOTAL_COST_THB > 0 ? ((TOTAL_THB - TOTAL_COST_THB + TOTAL_DIVS_LIFE_THB) / TOTAL_COST_THB) * 100 : 0;
 
 // Allocation by asset class
 const ALLOCATION = Object.values(ASSET_CLASSES).map(c => {
   const sum = ENRICHED.filter(a => a.cls === c.id).reduce((s,a)=> s + a.valueTHB, 0);
-  const pct = sum / TOTAL_THB;
+  const pct = TOTAL_THB > 0 ? sum / TOTAL_THB : 0;
   return { ...c, valueTHB: sum, pct, targetPct: TARGET[c.id] || 0, drift: pct - (TARGET[c.id] || 0) };
 });
 
 // Allocation by broker / app account — only those actually used
-const ALLOCATION_BROKER = Object.values(BROKERS)
+let ALLOCATION_BROKER = Object.values(BROKERS)
   .map(b => {
     const positions = ENRICHED.filter(a => a.broker === b.id);
     const sum = positions.reduce((s,a) => s + a.valueTHB, 0);
-    return { ...b, valueTHB: sum, pct: sum / TOTAL_THB, count: positions.length };
+    return { ...b, valueTHB: sum, pct: TOTAL_THB > 0 ? sum / TOTAL_THB : 0, count: positions.length };
   })
   .filter(b => b.count > 0)
   .sort((a,b) => b.valueTHB - a.valueTHB);
@@ -200,19 +204,64 @@ const ALLOCATION_BROKER = Object.values(BROKERS)
 const TOTAL_FEES_THB = ENRICHED.reduce((s,a) => s + toTHB(a.feesLifetime || 0, a.ccy), 0);
 
 // Daily change (weighted by value)
-const DAILY_CHANGE_PCT = ENRICHED.reduce((s,a) => s + (a.dayChangePct * a.valueTHB), 0) / TOTAL_THB;
+const DAILY_CHANGE_PCT = TOTAL_THB > 0 ? ENRICHED.reduce((s,a) => s + (a.dayChangePct * a.valueTHB), 0) / TOTAL_THB : 0;
 const DAILY_CHANGE_THB = TOTAL_THB * (DAILY_CHANGE_PCT / 100);
 
 // 30d portfolio sparkline (weighted)
 const PORTFOLIO_SPARK = (() => {
   const n = 30;
   const out = new Array(n).fill(0);
-  ENRICHED.forEach(a => {
-    const norm = a.spark.map(v => v / a.spark[0]);
-    for (let i=0;i<n;i++) out[i] += norm[i] * a.valueTHB;
-  });
+  if (TOTAL_THB > 0) {
+    ENRICHED.forEach(a => {
+      const norm = a.spark.map(v => a.spark[0] > 0 ? v / a.spark[0] : 0);
+      for (let i=0;i<n;i++) out[i] += norm[i] * a.valueTHB;
+    });
+  }
   return out;
 })();
+
+function recomputeDerived() {
+  const D = window.DataLayer || {};
+  D.TOTAL_THB = D.ENRICHED.reduce((s, a) => s + (a.valueTHB || 0), 0);
+  D.TOTAL_COST_THB = D.ENRICHED.reduce((s, a) => s + D.toTHB(a.cost || 0, a.ccy), 0);
+  D.TOTAL_DIVS_YTD_THB = D.ENRICHED.reduce((s, a) => s + D.toTHB(a.dividendsYTD || 0, a.ccy), 0);
+  D.TOTAL_DIVS_LIFE_THB = D.ENRICHED.reduce((s, a) => s + D.toTHB(a.dividendsLifetime || 0, a.ccy), 0);
+  D.TRUE_RETURN_PCT = D.TOTAL_COST_THB > 0 ? ((D.TOTAL_THB - D.TOTAL_COST_THB + D.TOTAL_DIVS_LIFE_THB) / D.TOTAL_COST_THB) * 100 : 0;
+  D.TOTAL_FEES_THB = D.ENRICHED.reduce((s, a) => s + D.toTHB(a.feesLifetime || 0, a.ccy), 0);
+
+  D.ALLOCATION.forEach(c => {
+    const sum = D.ENRICHED.filter(a => a.cls === c.id).reduce((s, a) => s + (a.valueTHB || 0), 0);
+    c.valueTHB = sum;
+    c.pct = D.TOTAL_THB > 0 ? sum / D.TOTAL_THB : 0;
+    c.drift = c.pct - c.targetPct;
+  });
+
+  D.ALLOCATION_BROKER = Object.values(D.BROKERS)
+    .map(b => {
+      const positions = D.ENRICHED.filter(a => a.broker === b.id);
+      const sum = positions.reduce((s, a) => s + (a.valueTHB || 0), 0);
+      return { ...b, valueTHB: sum, pct: D.TOTAL_THB > 0 ? sum / D.TOTAL_THB : 0, count: positions.length };
+    })
+    .filter(b => b.count > 0)
+    .sort((a, b) => b.valueTHB - a.valueTHB);
+
+  D.DAILY_CHANGE_PCT = D.TOTAL_THB > 0 ? D.ENRICHED.reduce((s, a) => s + (((a.dayChangePct || 0) * a.valueTHB) || 0), 0) / D.TOTAL_THB : 0;
+  D.DAILY_CHANGE_THB = D.TOTAL_THB * (D.DAILY_CHANGE_PCT / 100);
+
+  D.PORTFOLIO_SPARK = (() => {
+    const n = 30;
+    const out = new Array(n).fill(0);
+    if (D.TOTAL_THB > 0) {
+      D.ENRICHED.forEach(a => {
+        if (a.spark && a.spark.length >= n) {
+          const norm = a.spark.map(v => a.spark[0] > 0 ? v / a.spark[0] : 0);
+          for (let i = 0; i < n; i++) out[i] += norm[i] * (a.valueTHB || 0);
+        }
+      });
+    }
+    return out;
+  })();
+}
 
 // Formatters
 const fmtTHB = (n, opts={}) => {
@@ -238,4 +287,5 @@ window.DataLayer = {
   TOTAL_FEES_THB,
   DAILY_CHANGE_PCT, DAILY_CHANGE_THB, PORTFOLIO_SPARK,
   fmtTHB, fmtNum, fmtPct, fmtUnits, toTHB,
+  recomputeDerived,
 };

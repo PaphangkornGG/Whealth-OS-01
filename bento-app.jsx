@@ -357,7 +357,21 @@ function UserMenuPopover({ lang, profile, avatarGrad, displayInitials, setPage, 
     { id: 'goals',    icon: <Icon.Target size={13}/>,   th: 'เป้าหมายการลงทุน',     en: 'Investment goals',   go: () => setPage('goals') },
     { id: 'premium',  icon: <Icon.Sparkles size={13}/>, th: 'อัปเกรด Premium',      en: 'Upgrade to Premium', go: () => setPage('settings') },
     { id: 'help',     icon: <Icon.Alert size={13}/>,    th: 'ศูนย์ช่วยเหลือ',         en: 'Help center',        go: null },
-    { id: 'signout',  icon: <Icon.ArrowUp size={13}/>,  th: 'ออกจากระบบ',            en: 'Sign out',           go: null, danger: true },
+    { id: 'signout',  icon: <Icon.ArrowUp size={13}/>,  th: 'ออกจากระบบ',            en: 'Sign out',           go: async () => {
+      try {
+        const supabase = window.supabaseClient;
+        if (supabase) {
+          await supabase.auth.signOut();
+        }
+      } catch (err) {
+        console.error("TopNav signout error", err);
+      } finally {
+        try {
+          localStorage.setItem('netto:isGuest', 'false');
+        } catch (e) {}
+        window.location.reload();
+      }
+    }, danger: true },
   ];
   return (
     <PopoverCard>
@@ -455,7 +469,187 @@ function Toast({ show, children }) {
   );
 }
 
+function LoginPortal({ onGuest, lang }) {
+  const [authMode, setAuthMode] = React.useState('signin'); // 'signin' | 'signup'
+  const [email, setEmail] = React.useState('');
+  const [password, setPassword] = React.useState('');
+  const [loading, setLoading] = React.useState(false);
+  const [errorMsg, setErrorMsg] = React.useState(null);
+  const [successMsg, setSuccessMsg] = React.useState(null);
+
+  const handleAuth = async (e) => {
+    e.preventDefault();
+    setErrorMsg(null);
+    setSuccessMsg(null);
+    const supabase = window.supabaseClient;
+    if (!supabase) {
+      setErrorMsg(lang === 'th' ? 'ไม่สามารถเชื่อมต่อระบบฐานข้อมูลได้ กรุณาตรวจสอบการเชื่อมต่ออินเทอร์เน็ต' : 'Cannot connect to database. Please check your internet connection.');
+      return;
+    }
+
+    if (!email.trim() || !password.trim()) {
+      setErrorMsg(lang === 'th' ? 'กรุณากรอกข้อมูลให้ครบถ้วน' : 'Please fill out all fields');
+      return;
+    }
+
+    setLoading(true);
+    try {
+      if (authMode === 'signup') {
+        const { data, error } = await supabase.auth.signUp({
+          email: email.trim(),
+          password: password.trim(),
+        });
+        if (error) throw error;
+        if (data.user && data.session === null) {
+          setSuccessMsg(lang === 'th' ? 'สมัครสมาชิกสำเร็จ! โปรดตรวจสอบอีเมลเพื่อยืนยันตน' : 'Signed up successfully! Check your email to verify.');
+        } else {
+          setSuccessMsg(lang === 'th' ? 'สมัครสมาชิกสำเร็จและเข้าสู่ระบบเรียบร้อย!' : 'Registered and signed in successfully!');
+        }
+      } else {
+        const { data, error } = await supabase.auth.signInWithPassword({
+          email: email.trim(),
+          password: password.trim(),
+        });
+        if (error) throw error;
+        setSuccessMsg(lang === 'th' ? 'เข้าสู่ระบบสำเร็จ!' : 'Signed in successfully!');
+      }
+      setEmail('');
+      setPassword('');
+    } catch (err) {
+      setErrorMsg(err.message);
+    } finally {
+      setLoading(false);
+    }
+  };
+
+  return (
+    <div className="min-h-screen flex items-center justify-center p-4">
+      <div className="w-full max-w-[400px] bg-card border border-line rounded-2xl p-6 shadow-pop">
+        <div className="flex flex-col items-center text-center mb-6">
+          <div className="w-12 h-12 rounded-xl bg-ink-800 flex items-center justify-center text-white mb-3">
+            <svg width="28" height="28" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.2">
+              <rect x="2" y="2" width="20" height="20" rx="6" fill="oklch(0.22 0.009 250)"/>
+              <path d="M6 16 L10 8 L12 13 L14 9 L18 16" stroke="oklch(0.78 0.13 230)" strokeWidth="1.8" strokeLinecap="round" strokeLinejoin="round"/>
+            </svg>
+          </div>
+          <h1 className="text-ink-800 text-[20px] font-bold tracking-tight">Wealth OS</h1>
+          <p className="text-ink-500 text-[12px] mt-1">
+            {lang === 'th' ? 'ระบบจัดการและวิเคราะห์พอร์ตการลงทุนอัจฉริยะ' : 'Smart Wealth Management & Portfolio Analytics'}
+          </p>
+        </div>
+
+        <div className="flex items-center gap-1 bg-ink-100 border border-ink-200 rounded-lg p-0.5 text-[12px] mb-4">
+          <button
+            type="button"
+            onClick={() => { setAuthMode('signin'); setErrorMsg(null); }}
+            className={`flex-1 py-2 rounded-md transition-colors text-center font-medium ${authMode === 'signin' ? 'bg-card text-ink-800 shadow-card' : 'text-ink-500 hover:text-ink-700'}`}
+          >
+            {lang === 'th' ? 'เข้าสู่ระบบ' : 'Sign In'}
+          </button>
+          <button
+            type="button"
+            onClick={() => { setAuthMode('signup'); setErrorMsg(null); }}
+            className={`flex-1 py-2 rounded-md transition-colors text-center font-medium ${authMode === 'signup' ? 'bg-card text-ink-800 shadow-card' : 'text-ink-500 hover:text-ink-700'}`}
+          >
+            {lang === 'th' ? 'สมัครสมาชิก' : 'Create Account'}
+          </button>
+        </div>
+
+        <form onSubmit={handleAuth} className="space-y-4">
+          <label className="block bg-ink-100 border border-ink-200 rounded-lg px-3 py-2.5 focus-within:border-brand focus-within:bg-card transition-colors">
+            <div className="text-ink-500 text-[10px] uppercase tracking-wider font-semibold">{lang === 'th' ? 'อีเมล' : 'Email Address'}</div>
+            <input
+              type="email"
+              value={email}
+              onChange={(e) => setEmail(e.target.value)}
+              placeholder="you@example.com"
+              className="w-full bg-transparent text-ink-800 text-[13px] mt-0.5 focus:outline-none placeholder:text-ink-400"
+            />
+          </label>
+          <label className="block bg-ink-100 border border-ink-200 rounded-lg px-3 py-2.5 focus-within:border-brand focus-within:bg-card transition-colors">
+            <div className="text-ink-500 text-[10px] uppercase tracking-wider font-semibold">{lang === 'th' ? 'รหัสผ่าน' : 'Password'}</div>
+            <input
+              type="password"
+              value={password}
+              onChange={(e) => setPassword(e.target.value)}
+              placeholder="••••••••"
+              className="w-full bg-transparent text-ink-800 text-[13px] mt-0.5 focus:outline-none placeholder:text-ink-400"
+            />
+          </label>
+
+          {errorMsg && (
+            <div className="text-loss text-[12px] bg-loss-soft/20 border border-loss/20 rounded-lg p-2.5 flex items-center gap-2">
+              <svg className="w-4 h-4 shrink-0" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth="2">
+                <path strokeLinecap="round" strokeLinejoin="round" d="M12 9v2m0 4h.01m-6.938 4h13.856c1.54 0 2.502-1.667 1.732-3L13.732 4c-.77-1.333-2.694-1.333-3.464 0L3.34 16c-.77 1.333.192 3 1.732 3z"/>
+              </svg>
+              <span className="break-all">{errorMsg}</span>
+            </div>
+          )}
+
+          {successMsg && (
+            <div className="text-gain text-[12px] bg-gain-soft/20 border border-gain/20 rounded-lg p-2.5 flex items-center gap-2">
+              <svg className="w-4 h-4 shrink-0" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth="2">
+                <path strokeLinecap="round" strokeLinejoin="round" d="M9 12l2 2 4-4m6 2a9 9 0 11-18 0 9 9 0 0118 0z"/>
+              </svg>
+              <span>{successMsg}</span>
+            </div>
+          )}
+
+          <button
+            type="submit"
+            disabled={loading}
+            className="w-full py-2.5 bg-brand text-white hover:opacity-90 text-[13px] font-semibold rounded-lg transition-opacity flex items-center justify-center gap-1.5 cursor-pointer disabled:opacity-50"
+          >
+            {loading ? (
+              <span className="w-4 h-4 rounded-full border-2 border-white border-t-transparent animate-spin"/>
+            ) : (
+              <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.5" strokeLinecap="round" strokeLinejoin="round">
+                <path d="M20 21v-2a4 4 0 0 0-4-4H8a4 4 0 0 0-4 4v2"/>
+                <circle cx="12" cy="7" r="4"/>
+              </svg>
+            )}
+            <span>
+              {authMode === 'signin'
+                ? (lang === 'th' ? 'เข้าสู่ระบบ' : 'Sign In')
+                : (lang === 'th' ? 'สมัครสมาชิก' : 'Create Account')}
+            </span>
+          </button>
+        </form>
+
+        <div className="relative flex py-3 items-center">
+          <div className="flex-grow border-t border-line2"></div>
+          <span className="flex-shrink mx-4 text-ink-400 text-[11px] uppercase tracking-wider">{lang === 'th' ? 'หรือ' : 'or'}</span>
+          <div className="flex-grow border-t border-line2"></div>
+        </div>
+
+        <button
+          type="button"
+          onClick={onGuest}
+          className="w-full py-2 bg-ink-100 hover:bg-ink-200 border border-line text-ink-700 text-[12px] font-semibold rounded-lg transition-colors cursor-pointer text-center"
+        >
+          {lang === 'th' ? 'ใช้งานแบบบุคคลทั่วไป (Guest Mode)' : 'Continue as Guest'}
+        </button>
+      </div>
+    </div>
+  );
+}
+
 function App() {
+  const [isGuest, setIsGuest] = React.useState(() => {
+    try {
+      return localStorage.getItem('netto:isGuest') === 'true';
+    } catch {
+      return false;
+    }
+  });
+
+  const handleGuest = () => {
+    setIsGuest(true);
+    try {
+      localStorage.setItem('netto:isGuest', 'true');
+    } catch {}
+  };
+
   const [page, setPage] = React.useState(() => {
     try { return localStorage.getItem('wealthos_bento_page') || 'overview'; } catch { return 'overview'; }
   });
@@ -468,6 +662,7 @@ function App() {
   // Real-time price syncing states
   const [syncing, setSyncing] = React.useState(false);
   const [lastSync, setLastSync] = React.useState('Never');
+  const [user, setUser] = React.useState(null);
 
   const syncPrices = async () => {
     if (syncing) return;
@@ -604,81 +799,193 @@ function App() {
     return () => clearTimeout(timer);
   }, []);
 
-  // Hydrate user-entered transactions from localStorage on first mount.
+  // Hydrate user-entered transactions from Supabase or localStorage on first mount.
   React.useEffect(() => {
-    try {
-      const raw = localStorage.getItem('netto:userTxs');
-      if (!raw) return;
-      const userTxs = JSON.parse(raw);
-      if (!Array.isArray(userTxs) || userTxs.length === 0) return;
-      const D = window.DataLayer;
-      // Avoid duplicate hydration if user reopens during the same session
-      const existingIds = new Set(D.TRANSACTIONS.map(t => t.id));
-      const fresh = userTxs.filter(t => !existingIds.has(t.id)).map(t => ({ ...t, date: new Date(t.date) }));
-      if (fresh.length === 0) return;
-      // Re-apply each tx to the in-memory data layer so totals reflect it on reload
-      fresh.forEach(tx => {
-        D.TRANSACTIONS.unshift(tx);
-        let held = D.ENRICHED.find(a => a.ticker === tx.ticker && a.broker === tx.broker);
-        if (!held && tx.type === 'buy') {
-          const sibling = D.ENRICHED.find(a => a.ticker === tx.ticker);
-          held = {
-            ticker: tx.ticker,
-            name: tx.name || sibling?.name || tx.ticker,
-            cls: tx.cls || sibling?.cls || 'th',
-            ccy: tx.ccy || sibling?.ccy || 'THB',
-            broker: tx.broker,
-            units: 0,
-            avgCost: tx.price,
-            cost: 0,
-            price: tx.price,
-            value: 0,
-            valueTHB: 0,
-            unrealized: 0,
-            unrealizedPct: 0,
-            totalReturn: 0,
-            totalReturnPct: 0,
-            dividendsLifetime: 0,
-            dividendsYTD: 0,
-            feesLifetime: 0,
-            dayChangePct: 0,
-            spark: sibling?.spark || Array.from({ length: 30 }, (_, i) => 100 + i * 0.1),
-          };
-          D.ENRICHED.push(held);
+    const syncWithDbOrLocal = async () => {
+      const supabase = window.supabaseClient;
+      if (!supabase) return;
+      const { data: { session } } = await supabase.auth.getSession();
+      const sessionUser = session?.user || null;
+      setUser(sessionUser);
+
+      if (sessionUser) {
+        // Logged in! Fetch transactions from Supabase
+        const { data, error } = await supabase
+          .from('transactions')
+          .select('*')
+          .order('date', { ascending: false });
+        
+        if (!error && data) {
+          const D = window.DataLayer;
+          // Clear enriched portfolio holdings and start fresh
+          D.ENRICHED = [];
+          D.TRANSACTIONS = data.map(t => ({
+            id: t.id,
+            date: new Date(t.date),
+            type: t.type,
+            ticker: t.ticker,
+            name: t.name || t.ticker,
+            cls: t.cls,
+            broker: t.broker,
+            units: t.units ? parseFloat(t.units) : null,
+            price: t.price ? parseFloat(t.price) : null,
+            fee: t.fee ? parseFloat(t.fee) : 0,
+            ccy: t.ccy,
+            total: t.total ? parseFloat(t.total) : 0,
+          }));
+
+          // Re-apply each transaction to D.ENRICHED to reconstruct the lots in chronological order
+          const chrono = [...D.TRANSACTIONS].reverse();
+          chrono.forEach(tx => {
+            let held = D.ENRICHED.find(a => a.ticker === tx.ticker && a.broker === tx.broker);
+            if (!held && tx.type === 'buy') {
+              held = {
+                ticker: tx.ticker,
+                name: tx.name || tx.ticker,
+                cls: tx.cls || 'th',
+                ccy: tx.ccy || 'THB',
+                broker: tx.broker,
+                units: 0,
+                avgCost: tx.price,
+                cost: 0,
+                price: tx.price,
+                value: 0,
+                valueTHB: 0,
+                unrealized: 0,
+                unrealizedPct: 0,
+                totalReturn: 0,
+                totalReturnPct: 0,
+                dividendsLifetime: 0,
+                dividendsYTD: 0,
+                feesLifetime: 0,
+                dayChangePct: 0,
+                spark: Array.from({ length: 30 }, (_, i) => 100 + i * 0.1),
+              };
+              D.ENRICHED.push(held);
+            }
+            if (!held) return;
+            if (tx.type === 'buy' && tx.units && tx.price) {
+              const newUnits = held.units + tx.units;
+              const newCost = held.cost + tx.units * tx.price;
+              held.units = newUnits;
+              held.cost = newCost;
+              held.avgCost = newCost / newUnits;
+              held.price = tx.price;
+              held.value = newUnits * tx.price;
+              held.valueTHB = held.ccy === 'USD' ? held.value * D.FX.USD_THB : held.value;
+              held.unrealized = held.value - held.cost;
+              held.unrealizedPct = held.cost > 0 ? (held.unrealized / held.cost) * 100 : 0;
+              held.feesLifetime = (held.feesLifetime || 0) + (tx.fee || 0);
+            } else if (tx.type === 'sell' && tx.units && tx.price) {
+              const newUnits = Math.max(0, held.units - tx.units);
+              const sellRatio = held.units > 0 ? newUnits / held.units : 0;
+              held.cost = held.cost * sellRatio;
+              held.units = newUnits;
+              held.value = newUnits * tx.price;
+              held.valueTHB = held.ccy === 'USD' ? held.value * D.FX.USD_THB : held.value;
+              held.unrealized = held.value - held.cost;
+              held.unrealizedPct = held.cost > 0 ? (held.unrealized / held.cost) * 100 : 0;
+              held.price = tx.price;
+            } else if (tx.type === 'dividend') {
+              held.dividendsYTD = (held.dividendsYTD || 0) + tx.total;
+              held.dividendsLifetime = (held.dividendsLifetime || 0) + tx.total;
+            }
+          });
+
+          if (D.recomputeDerived) D.recomputeDerived();
+          setRefreshKey(k => k + 1);
         }
-        if (!held) return;
-        if (tx.type === 'buy' && tx.units && tx.price) {
-          const newUnits = held.units + tx.units;
-          const newCost = held.cost + tx.units * tx.price;
-          held.units = newUnits;
-          held.cost = newCost;
-          held.avgCost = newCost / newUnits;
-          held.price = tx.price;
-          held.value = newUnits * tx.price;
-          held.valueTHB = held.ccy === 'USD' ? held.value * D.FX.USD_THB : held.value;
-          held.unrealized = held.value - held.cost;
-          held.unrealizedPct = held.cost > 0 ? (held.unrealized / held.cost) * 100 : 0;
-          held.feesLifetime = (held.feesLifetime || 0) + (tx.fee || 0);
-        } else if (tx.type === 'sell' && tx.units && tx.price) {
-          const newUnits = Math.max(0, held.units - tx.units);
-          const sellRatio = held.units > 0 ? newUnits / held.units : 0;
-          held.cost = held.cost * sellRatio;
-          held.units = newUnits;
-          held.value = newUnits * tx.price;
-          held.valueTHB = held.ccy === 'USD' ? held.value * D.FX.USD_THB : held.value;
-          held.unrealized = held.value - held.cost;
-          held.unrealizedPct = held.cost > 0 ? (held.unrealized / held.cost) * 100 : 0;
-          held.price = tx.price;
-        } else if (tx.type === 'dividend') {
-          held.dividendsYTD = (held.dividendsYTD || 0) + tx.total;
-          held.dividendsLifetime = (held.dividendsLifetime || 0) + tx.total;
-        }
-      });
-      D.TOTAL_THB = D.ENRICHED.reduce((s, a) => s + a.valueTHB, 0);
-      D.TOTAL_COST_THB = D.ENRICHED.reduce((s, a) => s + (a.ccy === 'USD' ? a.cost * D.FX.USD_THB : a.cost), 0);
-      D.TOTAL_DIVS_YTD_THB = D.ENRICHED.reduce((s, a) => s + (a.ccy === 'USD' ? (a.dividendsYTD || 0) * D.FX.USD_THB : (a.dividendsYTD || 0)), 0);
-      setRefreshKey(k => k + 1);
-    } catch {}
+      } else {
+        // Not logged in: standard local storage hydration
+        try {
+          const raw = localStorage.getItem('netto:userTxs');
+          if (!raw) return;
+          const userTxs = JSON.parse(raw);
+          if (!Array.isArray(userTxs) || userTxs.length === 0) return;
+          const D = window.DataLayer;
+          const existingIds = new Set(D.TRANSACTIONS.map(t => t.id));
+          const fresh = userTxs.filter(t => !existingIds.has(t.id)).map(t => ({ ...t, date: new Date(t.date) }));
+          if (fresh.length === 0) return;
+          fresh.forEach(tx => {
+            D.TRANSACTIONS.unshift(tx);
+            let held = D.ENRICHED.find(a => a.ticker === tx.ticker && a.broker === tx.broker);
+            if (!held && tx.type === 'buy') {
+              const sibling = D.ENRICHED.find(a => a.ticker === tx.ticker);
+              held = {
+                ticker: tx.ticker,
+                name: tx.name || sibling?.name || tx.ticker,
+                cls: tx.cls || sibling?.cls || 'th',
+                ccy: tx.ccy || sibling?.ccy || 'THB',
+                broker: tx.broker,
+                units: 0,
+                avgCost: tx.price,
+                cost: 0,
+                price: tx.price,
+                value: 0,
+                valueTHB: 0,
+                unrealized: 0,
+                unrealizedPct: 0,
+                totalReturn: 0,
+                totalReturnPct: 0,
+                dividendsLifetime: 0,
+                dividendsYTD: 0,
+                feesLifetime: 0,
+                dayChangePct: 0,
+                spark: sibling?.spark || Array.from({ length: 30 }, (_, i) => 100 + i * 0.1),
+              };
+              D.ENRICHED.push(held);
+            }
+            if (!held) return;
+            if (tx.type === 'buy' && tx.units && tx.price) {
+              const newUnits = held.units + tx.units;
+              const newCost = held.cost + tx.units * tx.price;
+              held.units = newUnits;
+              held.cost = newCost;
+              held.avgCost = newCost / newUnits;
+              held.price = tx.price;
+              held.value = newUnits * tx.price;
+              held.valueTHB = held.ccy === 'USD' ? held.value * D.FX.USD_THB : held.value;
+              held.unrealized = held.value - held.cost;
+              held.unrealizedPct = held.cost > 0 ? (held.unrealized / held.cost) * 100 : 0;
+              held.feesLifetime = (held.feesLifetime || 0) + (tx.fee || 0);
+            } else if (tx.type === 'sell' && tx.units && tx.price) {
+              const newUnits = Math.max(0, held.units - tx.units);
+              const sellRatio = held.units > 0 ? newUnits / held.units : 0;
+              held.cost = held.cost * sellRatio;
+              held.units = newUnits;
+              held.value = newUnits * tx.price;
+              held.valueTHB = held.ccy === 'USD' ? held.value * D.FX.USD_THB : held.value;
+              held.unrealized = held.value - held.cost;
+              held.unrealizedPct = held.cost > 0 ? (held.unrealized / held.cost) * 100 : 0;
+              held.price = tx.price;
+            } else if (tx.type === 'dividend') {
+              held.dividendsYTD = (held.dividendsYTD || 0) + tx.total;
+              held.dividendsLifetime = (held.dividendsLifetime || 0) + tx.total;
+            }
+          });
+          if (D.recomputeDerived) D.recomputeDerived();
+          setRefreshKey(k => k + 1);
+        } catch {}
+      }
+    };
+
+    syncWithDbOrLocal();
+
+    const { data: { subscription } } = window.supabaseClient?.auth.onAuthStateChange((event, session) => {
+      const activeUser = session?.user || null;
+      setUser(activeUser);
+      if (activeUser) {
+        setIsGuest(false);
+        try { localStorage.setItem('netto:isGuest', 'false'); } catch {}
+      } else if (event === 'SIGNED_OUT') {
+        setIsGuest(false);
+        try { localStorage.setItem('netto:isGuest', 'false'); } catch {}
+      }
+      syncWithDbOrLocal();
+      window.dispatchEvent(new Event('netto:user-changed'));
+    }) || { data: { subscription: { unsubscribe: () => {} } } };
+
+    return () => subscription.unsubscribe();
   }, []);
 
   React.useEffect(() => {
@@ -712,7 +1019,7 @@ function App() {
     syncPrices,
   }), [syncing, lastSync]);
 
-  function handleSave(tx) {
+  async function handleSave(tx) {
     setModalOpen(false);
     setModalPrefill(null);
 
@@ -753,7 +1060,8 @@ function App() {
           : ccy === 'USD' ? 'us'
           : 'th');
     const newTx = {
-      id: `user-${Date.now()}`,
+      // Temporary ID for UI rendering. Sync re-populates proper UUID.
+      id: `temp-${Date.now()}`,
       // tx.date is a YYYY-MM-DD string from the modal's <input type="date">.
       // Anchor it to local noon so the date doesn't shift across timezones.
       date: tx.date ? new Date(`${tx.date}T12:00:00`) : new Date(),
@@ -829,16 +1137,43 @@ function App() {
     }
 
     // 3) Recompute portfolio aggregates.
-    D.TOTAL_THB = D.ENRICHED.reduce((s, a) => s + a.valueTHB, 0);
-    D.TOTAL_COST_THB = D.ENRICHED.reduce((s, a) => s + (a.ccy === 'USD' ? a.cost * D.FX.USD_THB : a.cost), 0);
-    D.TOTAL_DIVS_YTD_THB = D.ENRICHED.reduce((s, a) => s + (a.ccy === 'USD' ? (a.dividendsYTD || 0) * D.FX.USD_THB : (a.dividendsYTD || 0)), 0);
+    if (D.recomputeDerived) D.recomputeDerived();
 
     // 4) Persist user-entered txs across reloads.
-    try {
-      const userTxs = JSON.parse(localStorage.getItem('netto:userTxs') || '[]');
-      userTxs.unshift({ ...newTx, date: newTx.date.toISOString() });
-      localStorage.setItem('netto:userTxs', JSON.stringify(userTxs.slice(0, 200)));
-    } catch {}
+    const persistAndSync = async () => {
+      const supabase = window.supabaseClient;
+      if (user && supabase) {
+        const { error } = await supabase
+          .from('transactions')
+          .insert({
+            user_id: user.id,
+            date: newTx.date.toISOString(),
+            type: newTx.type,
+            ticker: newTx.ticker,
+            name: newTx.name,
+            cls: newTx.cls,
+            broker: newTx.broker,
+            units: newTx.units,
+            price: newTx.price,
+            fee: newTx.fee,
+            ccy: newTx.ccy,
+            total: newTx.total,
+          });
+        if (error) {
+          showToast(`Cloud Sync Error: ${error.message}`);
+        } else {
+          // Notify components that data has updated
+          window.dispatchEvent(new Event('netto:user-changed'));
+        }
+      } else {
+        try {
+          const userTxs = JSON.parse(localStorage.getItem('netto:userTxs') || '[]');
+          userTxs.unshift({ ...newTx, id: `user-${Date.now()}`, date: newTx.date.toISOString() });
+          localStorage.setItem('netto:userTxs', JSON.stringify(userTxs.slice(0, 200)));
+        } catch {}
+      }
+    };
+    persistAndSync();
 
     // 5) Force re-render of the whole app so derived cards reflect new totals.
     setRefreshKey(k => k + 1);
@@ -853,6 +1188,16 @@ function App() {
       ? `฿${Math.round(tx.amount).toLocaleString('en-US')}`
       : `${tx.amount.toLocaleString('en-US', { maximumFractionDigits: 4 })} @ ${ccy === 'USD' ? '$' : '฿'}${tx.price.toLocaleString('en-US', { maximumFractionDigits: 2 })}`;
     showToast(`${isTh ? verbTh : verbEn} ${tickerUpper} · ${amountStr}`);
+  }
+
+  const langName = (window.localStorage.getItem('wealthos_lang') || 'en').toLowerCase();
+
+  if (!user && !isGuest) {
+    return (
+      <LangProvider>
+        <LoginPortal onGuest={handleGuest} lang={langName} />
+      </LangProvider>
+    );
   }
 
   return (

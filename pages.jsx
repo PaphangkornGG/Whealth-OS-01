@@ -729,9 +729,247 @@ function ProfileAvatarPicker({ draft, updateDraft, lang }) {
   );
 }
 
+function CloudSyncPanel({ lang }) {
+  const [session, setSession] = React.useState(null);
+  const [loading, setLoading] = React.useState(false);
+  const [authMode, setAuthMode] = React.useState('signin'); // 'signin' | 'signup'
+  const [email, setEmail] = React.useState('');
+  const [password, setPassword] = React.useState('');
+  const [errorMsg, setErrorMsg] = React.useState(null);
+  const [successMsg, setSuccessMsg] = React.useState(null);
+
+  React.useEffect(() => {
+    const supabase = window.supabaseClient;
+    if (!supabase) return;
+
+    // Get initial session
+    supabase.auth.getSession().then(({ data }) => {
+      setSession(data?.session || null);
+    });
+
+    // Listen to changes directly
+    const { data: { subscription } } = supabase.auth.onAuthStateChange((event, session) => {
+      setSession(session || null);
+    });
+
+    return () => subscription.unsubscribe();
+  }, []);
+
+  const handleAuth = async (e) => {
+    e.preventDefault();
+    setErrorMsg(null);
+    setSuccessMsg(null);
+    const supabase = window.supabaseClient;
+    if (!supabase) {
+      setErrorMsg(lang === 'th' ? 'ไม่สามารถเชื่อมต่อระบบฐานข้อมูลได้ กรุณาตรวจสอบการเชื่อมต่ออินเทอร์เน็ต' : 'Cannot connect to database. Please check your internet connection.');
+      return;
+    }
+
+    if (!email.trim() || !password.trim()) {
+      setErrorMsg(lang === 'th' ? 'กรุณากรอกข้อมูลให้ครบถ้วน' : 'Please fill out all fields');
+      return;
+    }
+
+    setLoading(true);
+    try {
+      if (authMode === 'signup') {
+        const { data, error } = await supabase.auth.signUp({
+          email: email.trim(),
+          password: password.trim(),
+        });
+        if (error) throw error;
+        if (data.user && data.session === null) {
+          setSuccessMsg(lang === 'th' ? 'สมัครสมาชิกสำเร็จ! โปรดตรวจสอบอีเมลเพื่อยืนยันตน' : 'Signed up successfully! Check your email to verify.');
+        } else {
+          setSuccessMsg(lang === 'th' ? 'สมัครสมาชิกสำเร็จและเข้าสู่ระบบเรียบร้อย!' : 'Registered and signed in successfully!');
+          setSession(data.session);
+        }
+      } else {
+        const { data, error } = await supabase.auth.signInWithPassword({
+          email: email.trim(),
+          password: password.trim(),
+        });
+        if (error) throw error;
+        setSession(data.session);
+        setSuccessMsg(lang === 'th' ? 'เข้าสู่ระบบสำเร็จ!' : 'Signed in successfully!');
+      }
+      setEmail('');
+      setPassword('');
+    } catch (err) {
+      setErrorMsg(err.message);
+    } finally {
+      setLoading(false);
+    }
+  };
+
+  const handleSignOut = async () => {
+    setErrorMsg(null);
+    setSuccessMsg(null);
+    setLoading(true);
+    try {
+      const supabase = window.supabaseClient;
+      if (supabase) {
+        await supabase.auth.signOut();
+      }
+    } catch (err) {
+      console.error("Supabase signOut error", err);
+    } finally {
+      // Force local clean state even if server session clean failed
+      setSession(null);
+      setLoading(false);
+      try {
+        localStorage.setItem('netto:isGuest', 'false');
+      } catch (e) {}
+      window.location.reload();
+    }
+  };
+
+  const user = session?.user;
+
+  return (
+    <div className="bg-ink-50 border border-ink-200 rounded-2xl p-5 shadow-card fade-up mb-4">
+      <div className="flex items-start gap-4 justify-between">
+        <div className="flex items-center gap-3">
+          <div className={`w-10 h-10 rounded-lg flex items-center justify-center shrink-0 ${user ? 'bg-gain-soft text-gain' : 'bg-brand-soft text-brand'}`}>
+            {user ? (
+              <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
+                <path d="M12 2v20M17 5H9.5a3.5 3.5 0 0 0 0 7h5a3.5 3.5 0 0 1 0 7H6"/>
+              </svg>
+            ) : (
+              <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
+                <path d="M17.5 19A5.5 5.5 0 0 0 18 8.02a1 1 0 0 0-.89-.58h-.07a7.5 7.5 0 0 0-14.54 2.25 1 1 0 0 0 .78 1.13A4 4 0 0 0 7.5 19H17.5z"/>
+              </svg>
+            )}
+          </div>
+          <div>
+            <h3 className="text-ink-700 text-sm font-semibold">
+              {lang === 'th' ? 'การซิงค์ข้อมูลคลาวด์' : 'Cloud Sync & Storage'}
+            </h3>
+            <p className="text-ink-500 text-[12px] mt-0.5">
+              {user 
+                ? (lang === 'th' ? 'พอร์ตของคุณกำลังซิงค์และแบ็กอัปอยู่บนเซิร์ฟเวอร์แบบเรียลไทม์' : 'Your portfolio is synced and backed up on the cloud in real-time')
+                : (lang === 'th' ? 'สมัครสมาชิกเพื่อจัดเก็บข้อมูลธุรกรรมและพอร์ตของคุณบนคลาวด์ฟรี' : 'Create a free account to back up and sync your transactions across devices')}
+            </p>
+          </div>
+        </div>
+        {user && (
+          <span className="text-[10px] uppercase tracking-wider text-gain bg-gain-soft border border-gain/20 rounded px-2 py-0.5 flex items-center gap-1 font-semibold">
+            <span className="w-1.5 h-1.5 rounded-full bg-gain animate-ping"></span>
+            {lang === 'th' ? 'เชื่อมต่อแล้ว' : 'Connected'}
+          </span>
+        )}
+      </div>
+
+      {user ? (
+        <div className="mt-5 pt-4 border-t border-ink-200 flex flex-col sm:flex-row sm:items-center justify-between gap-4">
+          <div className="space-y-0.5">
+            <div className="text-[10px] text-ink-500 uppercase tracking-wider font-semibold">
+              {lang === 'th' ? 'บัญชีผู้ใช้ปัจจุบัน' : 'Logged in as'}
+            </div>
+            <div className="text-ink-800 text-[14px] font-medium">{user.email}</div>
+          </div>
+          <button
+            onClick={handleSignOut}
+            disabled={loading}
+            className="px-4 py-2 bg-ink-100 hover:bg-ink-200 border border-ink-300 text-ink-700 text-[12px] font-semibold rounded-lg transition-colors cursor-pointer disabled:opacity-50"
+          >
+            {loading ? (lang === 'th' ? 'กำลังโหลด...' : 'Loading...') : (lang === 'th' ? 'ออกจากระบบ' : 'Sign Out')}
+          </button>
+        </div>
+      ) : (
+        <form onSubmit={handleAuth} className="mt-5 pt-4 border-t border-ink-200 space-y-4">
+          <div className="flex items-center gap-1 bg-ink-100 border border-ink-200 rounded-lg p-0.5 text-[12px] w-fit">
+            <button
+              type="button"
+              onClick={() => { setAuthMode('signin'); setErrorMsg(null); }}
+              className={`px-3 py-1.5 rounded-md transition-colors ${authMode === 'signin' ? 'bg-ink-200 text-ink-800 font-medium' : 'text-ink-500 hover:text-ink-700'}`}
+            >
+              {lang === 'th' ? 'เข้าสู่ระบบ' : 'Sign In'}
+            </button>
+            <button
+              type="button"
+              onClick={() => { setAuthMode('signup'); setErrorMsg(null); }}
+              className={`px-3 py-1.5 rounded-md transition-colors ${authMode === 'signup' ? 'bg-ink-200 text-ink-800 font-medium' : 'text-ink-500 hover:text-ink-700'}`}
+            >
+              {lang === 'th' ? 'สมัครสมาชิก' : 'Create Account'}
+            </button>
+          </div>
+
+          <div className="grid grid-cols-1 md:grid-cols-2 gap-3">
+            <label className="block bg-ink-100 border border-ink-200 rounded-lg px-3 py-2 focus-within:border-brand focus-within:bg-card transition-colors">
+              <div className="text-ink-500 text-[10px] uppercase tracking-wider font-semibold">{lang === 'th' ? 'อีเมล' : 'Email Address'}</div>
+              <input
+                type="email"
+                value={email}
+                onChange={(e) => setEmail(e.target.value)}
+                placeholder="you@example.com"
+                className="w-full bg-transparent text-ink-800 text-[13px] mt-0.5 focus:outline-none placeholder:text-ink-400"
+              />
+            </label>
+            <label className="block bg-ink-100 border border-ink-200 rounded-lg px-3 py-2 focus-within:border-brand focus-within:bg-card transition-colors">
+              <div className="text-ink-500 text-[10px] uppercase tracking-wider font-semibold">{lang === 'th' ? 'รหัสผ่าน' : 'Password'}</div>
+              <input
+                type="password"
+                value={password}
+                onChange={(e) => setPassword(e.target.value)}
+                placeholder="••••••••"
+                className="w-full bg-transparent text-ink-800 text-[13px] mt-0.5 focus:outline-none placeholder:text-ink-400"
+              />
+            </label>
+          </div>
+
+          {errorMsg && (
+            <div className="text-loss text-[12px] bg-loss-soft/20 border border-loss/20 rounded-lg p-2.5 flex items-center gap-2">
+              <svg className="w-4 h-4 shrink-0" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth="2">
+                <path strokeLinecap="round" strokeLinejoin="round" d="M12 9v2m0 4h.01m-6.938 4h13.856c1.54 0 2.502-1.667 1.732-3L13.732 4c-.77-1.333-2.694-1.333-3.464 0L3.34 16c-.77 1.333.192 3 1.732 3z"/>
+              </svg>
+              <span>{errorMsg}</span>
+            </div>
+          )}
+
+          {successMsg && (
+            <div className="text-gain text-[12px] bg-gain-soft/20 border border-gain/20 rounded-lg p-2.5 flex items-center gap-2">
+              <svg className="w-4 h-4 shrink-0" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth="2">
+                <path strokeLinecap="round" strokeLinejoin="round" d="M9 12l2 2 4-4m6 2a9 9 0 11-18 0 9 9 0 0118 0z"/>
+              </svg>
+              <span>{successMsg}</span>
+            </div>
+          )}
+
+          <button
+            type="submit"
+            disabled={loading}
+            className="w-full sm:w-auto px-5 py-2 bg-brand text-white hover:opacity-90 text-[13px] font-semibold rounded-lg transition-opacity flex items-center justify-center gap-1.5 cursor-pointer disabled:opacity-50"
+          >
+            {loading ? (
+              <span className="w-4 h-4 rounded-full border-2 border-white border-t-transparent animate-spin"/>
+            ) : (
+              <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.5" strokeLinecap="round" strokeLinejoin="round">
+                <path d="M20 21v-2a4 4 0 0 0-4-4H8a4 4 0 0 0-4 4v2"/>
+                <circle cx="12" cy="7" r="4"/>
+              </svg>
+            )}
+            <span>
+              {authMode === 'signin'
+                ? (lang === 'th' ? 'เข้าสู่ระบบคลาวด์' : 'Sign In')
+                : (lang === 'th' ? 'สร้างบัญชีผู้ใช้' : 'Create Account')}
+            </span>
+          </button>
+        </form>
+      )}
+    </div>
+  );
+}
+
 function SettingsPage() {
   const { t, lang, setLang } = window.useT();
   const [policyMode, setPolicyMode] = React.useState('class'); // 'class' | 'asset'
+  const [useMockData, setUseMockData] = React.useState(() => {
+    if (typeof localStorage !== 'undefined') {
+      return localStorage.getItem('netto:useMockData') !== 'false';
+    }
+    return true;
+  });
 
   // Profile state — hydrated from localStorage, reset-able
   const [profile, setProfile] = React.useState(() => {
@@ -744,7 +982,6 @@ function SettingsPage() {
   const dirty = React.useMemo(() => JSON.stringify(profile) !== JSON.stringify(draft), [profile, draft]);
   const updateDraft = (patch) => setDraft(p => {
     const next = { ...p, ...patch };
-    // Keep initials in sync with name unless user explicitly set custom initials
     if (patch.name !== undefined) {
       const parts = (patch.name || '').trim().split(/\s+/).filter(Boolean);
       if (parts.length >= 2) next.initials = (parts[0][0] + parts[1][0]).toUpperCase();
@@ -755,7 +992,6 @@ function SettingsPage() {
   const saveProfile = () => {
     setProfile(draft);
     try { localStorage.setItem('netto:profile', JSON.stringify(draft)); } catch {}
-    // Notify the rest of the app (TopNav avatar/name) that profile changed.
     try { window.dispatchEvent(new Event('netto:profile-changed')); } catch {}
   };
   const revertProfile = () => setDraft(profile);
@@ -777,7 +1013,6 @@ function SettingsPage() {
     setter(p => ({ ...p, [k]: v }));
   }
 
-  // Auto-balance: scales all other entries to make total = 100%
   function autoBalance(map, setter) {
     const sum = Object.values(map).reduce((s, v) => s + v, 0);
     if (sum === 0) return;
@@ -787,7 +1022,6 @@ function SettingsPage() {
     setter(next);
   }
 
-  // Reset to current actual allocation
   function resetToCurrent() {
     if (policyMode === 'class') {
       const next = {};
@@ -807,6 +1041,8 @@ function SettingsPage() {
         title={lang === 'th' ? 'การตั้งค่า' : 'Settings'}
         subtitle={lang === 'th' ? 'ภาษา นโยบาย และแอปลงทุน' : 'Language, policy, and connected investment apps'}
       />
+
+      <CloudSyncPanel lang={lang} />
 
       {/* Language */}
       <SettingsSection title={lang === 'th' ? 'ภาษา' : 'Language'} desc={lang === 'th' ? 'เปลี่ยนภาษาที่แสดง' : 'Display language for the app'}>
@@ -1099,33 +1335,70 @@ function SettingsPage() {
         title={lang === 'th' ? 'จัดการข้อมูล' : 'Data Management'}
         desc={lang === 'th' ? 'ล้างข้อมูลธุรกรรมและประวัติทั้งหมด' : 'Delete all custom transaction history and reset data'}
       >
-        <div className="bg-loss-soft/20 border border-loss/20 rounded-xl p-4 flex flex-col md:flex-row md:items-center justify-between gap-4">
-          <div className="space-y-1">
-            <h4 className="text-loss text-[13px] font-semibold flex items-center gap-1.5">
-              <Icon.Alert size={14}/>
-              {lang === 'th' ? 'ลบประวัติธุรกรรมทั้งหมด' : 'Clear All Transaction History'}
-            </h4>
-            <p className="text-ink-500 text-[12px] max-w-md">
-              {lang === 'th' 
-                ? 'การลบนี้จะล้างประวัติการทำรายการซื้อ/ขาย/ปันผลที่คุณบันทึกไว้ทั้งหมดจากเบราว์เซอร์นี้ และไม่สามารถกู้คืนได้' 
-                : 'This will delete all custom buy, sell, and dividend transactions you have logged on this browser. This action cannot be undone.'}
-            </p>
-          </div>
-          <button
-            type="button"
-            onClick={() => {
-              const confirmMsg = lang === 'th' 
-                ? 'คุณแน่ใจหรือไม่ที่จะลบประวัติธุรกรรมทั้งหมด? การกระทำนี้ไม่สามารถย้อนกลับได้' 
-                : 'Are you sure you want to delete all transaction history? This action is permanent and cannot be undone.';
-              if (window.confirm(confirmMsg)) {
-                localStorage.removeItem('netto:userTxs');
+        <div className="space-y-4">
+          {/* Demo Data Management */}
+          <div className="bg-ink-100 border border-ink-200 rounded-xl p-4 flex flex-col md:flex-row md:items-center justify-between gap-4">
+            <div className="space-y-1">
+              <h4 className="text-ink-800 text-[13px] font-semibold flex items-center gap-1.5">
+                <Icon.Folder size={14} className="text-brand"/>
+                {lang === 'th' ? 'ข้อมูลพอร์ตจำลอง (Demo Data)' : 'Demo Portfolio Data'}
+              </h4>
+              <p className="text-ink-500 text-[12px] max-w-md">
+                {lang === 'th' 
+                  ? 'แสดงข้อมูลสินทรัพย์ตัวอย่างเพื่อการทดลองใช้งาน สามารถปิดเพื่อเริ่มต้นจัดพอร์ตจริงของคุณได้' 
+                  : 'Display mock assets and holdings for testing. Toggle off to start tracking your real assets.'}
+              </p>
+            </div>
+            <button
+              type="button"
+              onClick={() => {
+                const nextVal = !useMockData;
+                localStorage.setItem('netto:useMockData', nextVal ? 'true' : 'false');
+                setUseMockData(nextVal);
                 window.location.reload();
-              }
-            }}
-            className="px-4 py-2 bg-loss text-white text-[12px] font-semibold rounded-lg hover:bg-loss/90 transition-colors shadow-sm self-start md:self-auto cursor-pointer"
-          >
-            {lang === 'th' ? 'ล้างประวัติทั้งหมด' : 'Clear All History'}
-          </button>
+              }}
+              className={`px-4 py-2 text-[12px] font-semibold rounded-lg shadow-sm transition-colors cursor-pointer ${
+                useMockData 
+                  ? 'bg-ink-200 text-ink-700 hover:bg-ink-300' 
+                  : 'bg-brand text-white hover:opacity-90'
+              }`}
+            >
+              {useMockData 
+                ? (lang === 'th' ? 'ซ่อนพอร์ตจำลอง' : 'Hide Demo Data') 
+                : (lang === 'th' ? 'โหลดพอร์ตจำลอง' : 'Load Demo Data')}
+            </button>
+          </div>
+
+          {/* Clear History */}
+          <div className="bg-loss-soft/20 border border-loss/20 rounded-xl p-4 flex flex-col md:flex-row md:items-center justify-between gap-4">
+            <div className="space-y-1">
+              <h4 className="text-loss text-[13px] font-semibold flex items-center gap-1.5">
+                <Icon.Alert size={14}/>
+                {lang === 'th' ? 'ลบประวัติธุรกรรมทั้งหมด' : 'Clear All Transaction History'}
+              </h4>
+              <p className="text-ink-500 text-[12px] max-w-md">
+                {lang === 'th' 
+                  ? 'การลบนี้จะล้างประวัติการทำรายการซื้อ/ขาย/ปันผลที่คุณบันทึกไว้ทั้งหมดจากเบราว์เซอร์นี้ และไม่สามารถกู้คืนได้ (และจะปิดข้อมูลตัวอย่าง)' 
+                  : 'This will delete all custom buy, sell, and dividend transactions you have logged on this browser. This action cannot be undone (and will hide demo data).'}
+              </p>
+            </div>
+            <button
+              type="button"
+              onClick={() => {
+                const confirmMsg = lang === 'th' 
+                  ? 'คุณแน่ใจหรือไม่ที่จะลบประวัติธุรกรรมทั้งหมด? การกระทำนี้ไม่สามารถย้อนกลับได้' 
+                  : 'Are you sure you want to delete all transaction history? This action is permanent and cannot be undone.';
+                if (window.confirm(confirmMsg)) {
+                  localStorage.removeItem('netto:userTxs');
+                  localStorage.setItem('netto:useMockData', 'false');
+                  window.location.reload();
+                }
+              }}
+              className="px-4 py-2 bg-loss text-white text-[12px] font-semibold rounded-lg hover:bg-loss/90 transition-colors shadow-sm self-start md:self-auto cursor-pointer"
+            >
+              {lang === 'th' ? 'ล้างประวัติทั้งหมด' : 'Clear All History'}
+            </button>
+          </div>
         </div>
       </SettingsSection>
     </>
