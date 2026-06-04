@@ -203,9 +203,12 @@ function AddToWatchlistModal({ open, lang, existing, onClose, onSave }) {
   const [form, setForm] = React.useState(empty);
   const firstRef = React.useRef(null);
 
+  const [fetching, setFetching] = React.useState(false);
+
   React.useEffect(() => {
     if (open) {
       setForm(empty());
+      setFetching(false);
       setTimeout(() => firstRef.current?.focus(), 50);
     }
   }, [open]);
@@ -225,8 +228,6 @@ function AddToWatchlistModal({ open, lang, existing, onClose, onSave }) {
     if (patch.cls && WATCH_CLASS_META[patch.cls]) next.ccy = WATCH_CLASS_META[patch.cls].ccy;
     return next;
   });
-
-  const [fetching, setFetching] = React.useState(false);
 
   const fetchTickerData = async () => {
     if (!form.ticker) return;
