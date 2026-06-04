@@ -414,11 +414,22 @@ function UserMenuPopover({ lang, profile, avatarGrad, displayInitials, setPage, 
   );
 }
 
-function Logo() {
+function Logo({ className = "w-8 h-8" }) {
   return (
-    <svg width="32" height="32" viewBox="0 0 32 32" fill="none">
-      <path d="M6 22 L10 8 L14 18 L18 12 L22 22" stroke="oklch(0.55 0.22 264)" strokeWidth="3" strokeLinecap="round" strokeLinejoin="round"/>
-      <circle cx="24" cy="10" r="3.5" fill="oklch(0.85 0.18 130)"/>
+    <svg className={className} viewBox="0 0 32 32" fill="none" xmlns="http://www.w3.org/2000/svg">
+      <defs>
+        <linearGradient id="wealth-logo-grad" x1="0" y1="0" x2="32" y2="32" gradientUnits="userSpaceOnUse">
+          <stop stopColor="oklch(0.45 0.2 260)" />
+          <stop offset="1" stopColor="oklch(0.3 0.15 280)" />
+        </linearGradient>
+        <linearGradient id="wealth-logo-accent" x1="8" y1="12" x2="24" y2="22" gradientUnits="userSpaceOnUse">
+          <stop stopColor="oklch(0.9 0.1 200)" />
+          <stop offset="1" stopColor="oklch(0.75 0.15 250)" />
+        </linearGradient>
+      </defs>
+      <rect width="32" height="32" rx="8" fill="url(#wealth-logo-grad)" />
+      <path d="M8 14 L12 22 L16 16 L20 22 L24 10" stroke="url(#wealth-logo-accent)" strokeWidth="2.5" strokeLinecap="round" strokeLinejoin="round" />
+      <circle cx="24" cy="10" r="2.5" fill="oklch(0.85 0.18 130)" />
     </svg>
   );
 }
@@ -539,11 +550,8 @@ function LoginPortal({ onGuest, lang }) {
     <div className="min-h-screen flex items-center justify-center p-4">
       <div className="w-full max-w-[400px] bg-card border border-line rounded-2xl p-6 shadow-pop">
         <div className="flex flex-col items-center text-center mb-6">
-          <div className="w-12 h-12 rounded-xl bg-ink-800 flex items-center justify-center text-white mb-3">
-            <svg width="28" height="28" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.2">
-              <rect x="2" y="2" width="20" height="20" rx="6" fill="oklch(0.22 0.009 250)"/>
-              <path d="M6 16 L10 8 L12 13 L14 9 L18 16" stroke="oklch(0.78 0.13 230)" strokeWidth="1.8" strokeLinecap="round" strokeLinejoin="round"/>
-            </svg>
+          <div className="w-12 h-12 flex items-center justify-center mb-3">
+            <Logo className="w-12 h-12" />
           </div>
           <h1 className="text-ink-800 text-[20px] font-bold tracking-tight">Wealth OS</h1>
           <p className="text-ink-500 text-[12px] mt-1">
