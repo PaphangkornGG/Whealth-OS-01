@@ -1,6 +1,23 @@
 const { Icon } = window;
 const { BROKERS, ENRICHED } = window.DataLayer;
 
+const COMMON_THAI_TICKERS = [
+  'PTT','AOT','KBANK','SCB','BBL','ADVANC','CPALL','TISCO','EPG','BDMS','MEGA',
+  'TRUE','LH','IVL','GULF','OR','CPN','MINT','CPF','BEM','BTS','HMPRO','WHA',
+  'TU','TOP','IRPC','TMB','TTB','BANPU','EA','GPSC','SPRC','STA','STEC','TCAP',
+  'THANI','TKN','TQM','VGI','SCC','BH','BCP','CENTEL','JMT',
+  'SINGER','KCE','HANA','SAWAD','MTC','TIDLOR','COM7','CBG','OSP','BGRIM','EGCO',
+  'RATCH','GLOW','INTUCH','KTB','KKP','QH','AP','SPALI','SIRI',
+  'ORI','ANAN','LPN','PSH','SPCG','DEMCO','GUNKUL','TPIPP','TPIPL','BCPG',
+  'CK','UNIQ','ITD','NWR','PLE','TRC','CNT','SQ','RT','SEAFCO','PYLON',
+  'TASCO','DOHOME','GLOBAL','ILM','MC','BEAUTY','KAMART','SABINA',
+  'AMATA','ROJNA','PIN','IE','FTREIT','WHART','EGATIF','JASIF','DIF',
+  'POPF','SIRIP','CPNCG','BOFFICE','ALLY','B-WORK','MJLF','TLHPF','URBANA',
+  'LHHOTEL','SHREIT','ERW','DUSIT','BAFS','AAV','NOK','BA',
+  'THAI','PRM','RCL','PSL','TTA','ASIMAR','NYT','KEX','JWD','III','PORT',
+  'WICE','LEO','SONIC','SELIC','SENA','LALIN','PF','MK','ESTAR','SPACK','UTP'
+];
+
 // Lookup live (latest) price for a ticker from current portfolio data.
 function getLivePrice(tickerInput) {
   if (!tickerInput) return null;
@@ -205,9 +222,18 @@ function QuickTxModal({ open, onClose, onSave, prefill }) {
     // Set initial logical guesses before network request returns
     if (!overridden) {
       const isCrypto = ['BTC','ETH','SOL','BNB','XRP','ADA','DOGE'].includes(upper);
+      const isThai = COMMON_THAI_TICKERS.includes(upper);
+      const isFund = upper.includes('-') || upper.includes('&') || upper.startsWith('SCB') || upper.startsWith('K-') || upper.startsWith('KF') || upper.startsWith('KT') || upper.startsWith('TMB') || upper.startsWith('ONE') || upper.startsWith('ASP');
+      
       if (isCrypto) {
         setCcy('USD');
         setCls('crypto');
+      } else if (isFund) {
+        setCcy('THB');
+        setCls('fund');
+      } else if (isThai) {
+        setCcy('THB');
+        setCls('th');
       } else if (/^[A-Z]{1,5}$/.test(upper)) {
         setCcy('USD');
         setCls('us');
@@ -221,20 +247,23 @@ function QuickTxModal({ open, onClose, onSave, prefill }) {
     const controller = new AbortController();
     const timeout = setTimeout(async () => {
       try {
-        let queryTicker = upper;
         const isCrypto = ['BTC','ETH','SOL','BNB','XRP','ADA','DOGE'].includes(upper);
-        const isThai = ['PTT','AOT','KBANK','SCB','BBL','ADVANC','CPALL','TISCO','EPG','BDMS','MEGA'].includes(upper) || /^[A-Z]{1,5}$/.test(upper);
+        const isThai = COMMON_THAI_TICKERS.includes(upper);
+        
+        let primaryTicker = upper;
+        let secondaryTicker = null;
         
         if (isCrypto) {
-          queryTicker = `${upper}-USD`;
-        } else if (isThai && !upper.includes('.') && !/^[A-Z]{1,5}$/.test(upper)) {
-          queryTicker = `${upper}.BK`;
+          primaryTicker = `${upper}-USD`;
+        } else if (isThai) {
+          primaryTicker = `${upper}.BK`;
+          secondaryTicker = upper; // Fallback to US if Thai ticker fetch fails (unlikely, but safe)
         } else if (/^[A-Z]{1,5}$/.test(upper)) {
-          // Default guess for general tickers: Thai stock first, then fall back to US
-          queryTicker = `${upper}.BK`;
+          primaryTicker = upper;   // Query US stock first
+          secondaryTicker = `${upper}.BK`; // Fallback to Thai stock if US fetch fails (handles general short codes)
         }
 
-        const res = await fetch(`/api/price?ticker=${encodeURIComponent(queryTicker)}`, { signal: controller.signal });
+        const res = await fetch(`/api/price?ticker=${encodeURIComponent(primaryTicker)}`, { signal: controller.signal });
         if (res.ok) {
           const data = await res.json();
           if (data.price) {
@@ -251,11 +280,13 @@ function QuickTxModal({ open, onClose, onSave, prefill }) {
                 setCls(isCrypto ? 'crypto' : 'us');
               }
             }
+            return; // Successfully fetched, return early!
           }
-        } else if (queryTicker.endsWith('.BK')) {
-          // Fallback to US stock if .BK query failed
-          const rawTicker = queryTicker.replace('.BK', '');
-          const res2 = await fetch(`/api/price?ticker=${encodeURIComponent(rawTicker)}`, { signal: controller.signal });
+        }
+        
+        // If primary ticker query failed, try secondary ticker fallback
+        if (secondaryTicker) {
+          const res2 = await fetch(`/api/price?ticker=${encodeURIComponent(secondaryTicker)}`, { signal: controller.signal });
           if (res2.ok) {
             const data2 = await res2.json();
             if (data2.price) {
