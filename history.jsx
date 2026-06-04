@@ -159,9 +159,8 @@
 
     txs.sort((a, b) => b.date - a.date);
     return txs;
-  }
-
-  const TRANSACTIONS = genTransactions();
+  const useMock = typeof localStorage !== 'undefined' && localStorage.getItem('netto:useMockData') !== 'false';
+  const TRANSACTIONS = useMock ? genTransactions() : [];
 
   // Goals — financial targets
   const GOALS = [
@@ -170,7 +169,7 @@
       label: { en: 'Retirement', th: 'เกษียณ' },
       target: 12_000_000,
       // contribution allocated proportionally from current portfolio
-      currentTHB: D.TOTAL_THB * 0.62,
+      currentTHB: useMock ? D.TOTAL_THB * 0.62 : 0,
       etaYear: 2042,
       icon: 'sparkles',
       accent: 'brand',
@@ -179,7 +178,7 @@
       id: 'house',
       label: { en: 'House Down Payment', th: 'ดาวน์บ้าน' },
       target: 2_500_000,
-      currentTHB: D.TOTAL_THB * 0.18,
+      currentTHB: useMock ? D.TOTAL_THB * 0.18 : 0,
       etaYear: 2028,
       icon: 'building',
       accent: 'gain',
@@ -188,7 +187,7 @@
       id: 'emergency',
       label: { en: 'Emergency Fund', th: 'เงินสำรองฉุกเฉิน' },
       target: 600_000,
-      currentTHB: 480_000, // == cash position
+      currentTHB: useMock ? 480_000 : 0, // == cash position
       etaYear: 2026,
       icon: 'wallet',
       accent: 'warn',
