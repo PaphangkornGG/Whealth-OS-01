@@ -1037,11 +1037,11 @@ function SettingsPage() {
     }
     return next;
   });
-  const saveProfile = () => {
+  const saveProfile = async () => {
     setProfile(draft);
     try { localStorage.setItem('netto:profile', JSON.stringify(draft)); } catch {}
     if (window.supabaseClient && window.AppUser) {
-      window.supabaseClient.auth.updateUser({ 
+      await window.supabaseClient.auth.updateUser({ 
         data: { 
           full_name: draft.name, 
           phone: draft.phone, 
