@@ -111,11 +111,13 @@ class SecApi {
     // Usually we need to provide a date. If we want the latest, SEC API might not have a "latest" endpoint without date.
     // However, some endpoints return an array of recent NAVs if date is omitted, or we might need to loop back a few days.
     // Wait, let's try calling without date or with today's date and going back up to 5 days.
-    let date = new Date();
+    const today = new Date();
     
-    // We try the last 7 days to find the most recent NAV
-    for (let i = 0; i < 7; i++) {
-      const dateString = date.toISOString().split('T')[0];
+    // We try the last 15 days to find the most recent NAV
+    for (let i = 0; i < 15; i++) {
+      const d = new Date(today);
+      d.setDate(d.getDate() - i);
+      const dateString = d.toISOString().split('T')[0];
       const url = `${SEC_API_URL.DAILY_INFO}/${projId}/dailynav/${dateString}`;
       
       try {
