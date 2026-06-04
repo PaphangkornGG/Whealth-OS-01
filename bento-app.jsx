@@ -18,7 +18,19 @@ function useProfile() {
   const read = () => {
     try {
       const raw = localStorage.getItem('netto:profile');
-      return raw ? { ...DEFAULT, ...JSON.parse(raw) } : DEFAULT;
+      let base = { ...DEFAULT };
+      const user = window.AppUser;
+      let finalProfile = raw ? { ...base, ...JSON.parse(raw) } : base;
+      if (user) {
+        finalProfile.email = user.email;
+        if (user.user_metadata?.full_name) {
+          finalProfile.name = user.user_metadata.full_name;
+          const parts = finalProfile.name.trim().split(/\s+/).filter(Boolean);
+          if (parts.length >= 2) finalProfile.initials = (parts[0][0] + parts[1][0]).toUpperCase();
+          else if (parts.length === 1) finalProfile.initials = parts[0].slice(0, 2).toUpperCase();
+        }
+      }
+      return finalProfile;
     } catch { return DEFAULT; }
   };
   const [profile, setProfile] = React.useState(read);
@@ -355,7 +367,6 @@ function UserMenuPopover({ lang, profile, avatarGrad, displayInitials, setPage, 
   const items = [
     { id: 'profile',  icon: <Icon.Settings size={13}/>, th: 'โปรไฟล์ & การตั้งค่า', en: 'Profile & Settings', go: () => setPage('settings') },
     { id: 'goals',    icon: <Icon.Target size={13}/>,   th: 'เป้าหมายการลงทุน',     en: 'Investment goals',   go: () => setPage('goals') },
-    { id: 'premium',  icon: <Icon.Sparkles size={13}/>, th: 'อัปเกรด Premium',      en: 'Upgrade to Premium', go: () => setPage('settings') },
     { id: 'help',     icon: <Icon.Alert size={13}/>,    th: 'ศูนย์ช่วยเหลือ',         en: 'Help center',        go: null },
     { id: 'signout',  icon: <Icon.ArrowUp size={13}/>,  th: 'ออกจากระบบ',            en: 'Sign out',           go: async () => {
       try {
@@ -385,10 +396,6 @@ function UserMenuPopover({ lang, profile, avatarGrad, displayInitials, setPage, 
         <div className="min-w-0">
           <div className="text-[13px] text-ink-900 font-semibold truncate">{profile.name || '—'}</div>
           <div className="text-[11px] text-ink-500 truncate">{profile.email || '—'}</div>
-          <div className="mt-1 inline-flex items-center gap-1 text-[9px] font-semibold text-warn bg-warn-soft border border-warn/20 rounded-full px-1.5 py-0.5">
-            <Icon.Sparkles size={9}/>
-            PREMIUM
-          </div>
         </div>
       </div>
       <div className="py-1">
@@ -474,6 +481,8 @@ function LoginPortal({ onGuest, lang }) {
   const [email, setEmail] = React.useState('');
   const [password, setPassword] = React.useState('');
   const [fullName, setFullName] = React.useState('');
+  const [phone, setPhone] = React.useState('');
+  const [dob, setDob] = React.useState('');
   const [loading, setLoading] = React.useState(false);
   const [errorMsg, setErrorMsg] = React.useState(null);
   const [successMsg, setSuccessMsg] = React.useState(null);
@@ -500,7 +509,7 @@ function LoginPortal({ onGuest, lang }) {
           email: email.trim(),
           password: password.trim(),
           options: {
-            data: { full_name: fullName.trim() }
+            data: { full_name: fullName.trim(), phone: phone.trim(), dob: dob.trim() }
           }
         });
         if (error) throw error;
@@ -560,7 +569,7 @@ function LoginPortal({ onGuest, lang }) {
         </div>
 
         <form onSubmit={handleAuth} className="space-y-4">
-          {authMode === 'signup' && (
+          {authMode === 'signup' && (<>
             <label className="block bg-ink-100 border border-ink-200 rounded-lg px-3 py-2.5 focus-within:border-brand focus-within:bg-card transition-colors">
               <div className="text-ink-500 text-[10px] uppercase tracking-wider font-semibold">{lang === 'th' ? 'ชื่อ-นามสกุล' : 'Full Name'}</div>
               <input
@@ -571,7 +580,15 @@ function LoginPortal({ onGuest, lang }) {
                 className="w-full bg-transparent text-ink-800 text-[13px] mt-0.5 focus:outline-none placeholder:text-ink-400"
               />
             </label>
-          )}
+            <label className="block bg-ink-100 border border-ink-200 rounded-lg px-3 py-2.5 focus-within:border-brand focus-within:bg-card transition-colors">
+              <div className="text-ink-500 text-[10px] uppercase tracking-wider font-semibold">{lang === 'th' ? 'เบอร์โทรศัพท์' : 'Phone'}</div>
+              <input type="tel" value={phone} onChange={(e) => setPhone(e.target.value)} placeholder="+66 81 234 5678" className="w-full bg-transparent text-ink-800 text-[13px] mt-0.5 focus:outline-none placeholder:text-ink-400" />
+            </label>
+            <label className="block bg-ink-100 border border-ink-200 rounded-lg px-3 py-2.5 focus-within:border-brand focus-within:bg-card transition-colors">
+              <div className="text-ink-500 text-[10px] uppercase tracking-wider font-semibold">{lang === 'th' ? 'วันเกิด' : 'Date of Birth'}</div>
+              <input type="date" value={dob} onChange={(e) => setDob(e.target.value)} className="w-full bg-transparent text-ink-800 text-[13px] mt-0.5 focus:outline-none placeholder:text-ink-400" />
+            </label>
+          </>)}
           <label className="block bg-ink-100 border border-ink-200 rounded-lg px-3 py-2.5 focus-within:border-brand focus-within:bg-card transition-colors">
             <div className="text-ink-500 text-[10px] uppercase tracking-wider font-semibold">{lang === 'th' ? 'อีเมล' : 'Email Address'}</div>
             <input

@@ -1010,7 +1010,7 @@ function SettingsPage() {
     setProfile(draft);
     try { localStorage.setItem('netto:profile', JSON.stringify(draft)); } catch {}
     if (window.supabaseClient && window.AppUser) {
-      window.supabaseClient.auth.updateUser({ data: { full_name: draft.name } });
+      window.supabaseClient.auth.updateUser({ data: { full_name: draft.name, phone: draft.phone, dob: draft.dob } });
     }
     try { window.dispatchEvent(new Event('netto:profile-changed')); } catch {}
   };
@@ -1166,7 +1166,6 @@ function SettingsPage() {
           <div className="flex-1 min-w-0">
             <div className="text-ink-900 font-semibold text-[15px] truncate">{draft.name || (lang === 'th' ? '— ไม่มีชื่อ —' : '— No name —')}</div>
             <div className="text-ink-500 text-[12px] truncate">{draft.email}</div>
-            <div className="text-ink-500 text-[11px] mt-1">{lang === 'th' ? 'สมาชิกตั้งแต่มี.ค. 2024 · Premium' : 'Member since Mar 2024 · Premium'}</div>
           </div>
         </div>
 
