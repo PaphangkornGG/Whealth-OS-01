@@ -982,14 +982,31 @@ function SettingsPage() {
       }
       let finalProfile = raw ? { ...base, ...JSON.parse(raw) } : base;
       
-      // Supabase metadata always overrides local storage for name/email
+      // Supabase metadata always overrides local storage for name/email/phone/dob etc.
       if (user) {
         finalProfile.email = user.email;
-        if (user.user_metadata?.full_name) {
-          finalProfile.name = user.user_metadata.full_name;
-          const parts = finalProfile.name.trim().split(/\s+/).filter(Boolean);
-          if (parts.length >= 2) finalProfile.initials = (parts[0][0] + parts[1][0]).toUpperCase();
-          else if (parts.length === 1) finalProfile.initials = parts[0].slice(0, 2).toUpperCase();
+        if (user.user_metadata) {
+          const meta = user.user_metadata;
+          if (meta.full_name) {
+            finalProfile.name = meta.full_name;
+            const parts = finalProfile.name.trim().split(/\s+/).filter(Boolean);
+            if (parts.length >= 2) finalProfile.initials = (parts[0][0] + parts[1][0]).toUpperCase();
+            else if (parts.length === 1) finalProfile.initials = parts[0].slice(0, 2).toUpperCase();
+          }
+          if (meta.phone) finalProfile.phone = meta.phone;
+          if (meta.dob) finalProfile.dob = meta.dob;
+          if (meta.country) finalProfile.country = meta.country;
+          if (meta.taxResidency) finalProfile.taxResidency = meta.taxResidency;
+          if (meta.refCcy) finalProfile.refCcy = meta.refCcy;
+          if (meta.timezone) finalProfile.timezone = meta.timezone;
+          if (meta.riskTolerance) finalProfile.riskTolerance = meta.riskTolerance;
+          if (meta.horizon) finalProfile.horizon = meta.horizon;
+          if (meta.monthlyContribTHB !== undefined) finalProfile.monthlyContribTHB = meta.monthlyContribTHB;
+          if (meta.avatarBg) finalProfile.avatarBg = meta.avatarBg;
+          if (meta.avatarImage !== undefined) finalProfile.avatarImage = meta.avatarImage;
+          if (meta.twoFA !== undefined) finalProfile.twoFA = meta.twoFA;
+          if (meta.emailAlerts !== undefined) finalProfile.emailAlerts = meta.emailAlerts;
+          if (meta.pushAlerts !== undefined) finalProfile.pushAlerts = meta.pushAlerts;
         }
       }
       return finalProfile;
@@ -1010,7 +1027,25 @@ function SettingsPage() {
     setProfile(draft);
     try { localStorage.setItem('netto:profile', JSON.stringify(draft)); } catch {}
     if (window.supabaseClient && window.AppUser) {
-      window.supabaseClient.auth.updateUser({ data: { full_name: draft.name, phone: draft.phone, dob: draft.dob } });
+      window.supabaseClient.auth.updateUser({ 
+        data: { 
+          full_name: draft.name, 
+          phone: draft.phone, 
+          dob: draft.dob,
+          country: draft.country,
+          taxResidency: draft.taxResidency,
+          refCcy: draft.refCcy,
+          timezone: draft.timezone,
+          riskTolerance: draft.riskTolerance,
+          horizon: draft.horizon,
+          monthlyContribTHB: draft.monthlyContribTHB,
+          avatarBg: draft.avatarBg,
+          avatarImage: draft.avatarImage,
+          twoFA: draft.twoFA,
+          emailAlerts: draft.emailAlerts,
+          pushAlerts: draft.pushAlerts,
+        } 
+      });
     }
     try { window.dispatchEvent(new Event('netto:profile-changed')); } catch {}
   };
