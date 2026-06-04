@@ -95,8 +95,30 @@ function TopNav({ page, setPage }) {
   const { t, lang, setLang } = useT();
   const nav = useNav();
   const profile = useProfile();
-  const [open, setOpen] = React.useState(null); // 'search' | 'share' | 'bell' | 'user' | null
+  const [open, setOpen] = React.useState(null);
   const close = () => setOpen(null);
+
+  const [notifications, setNotifications] = React.useState(() => {
+    try {
+      const raw = localStorage.getItem('netto:notifications');
+      if (raw) return JSON.parse(raw);
+    } catch {}
+    return [
+      { id: Date.now(), tone: 'brand', th: 'ยินดีต้อนรับสู่ Wealth OS!', en: 'Welcome to Wealth OS!', sub: lang === 'th' ? 'เพิ่งเข้ามา' : 'Just now', unread: true },
+      { id: Date.now()-1, tone: 'gain', th: 'เริ่มจัดพอร์ตการลงทุนของคุณ', en: 'Start managing your portfolio', sub: lang === 'th' ? 'วันนี้' : 'Today', unread: true }
+    ];
+  });
+  const unreadCount = notifications.filter(n => n.unread).length;
+  const markAllRead = () => {
+    const updated = notifications.map(n => ({ ...n, unread: false }));
+    setNotifications(updated);
+    localStorage.setItem('netto:notifications', JSON.stringify(updated));
+  };
+  const dismiss = (id) => {
+    const updated = notifications.filter(n => n.id !== id);
+    setNotifications(updated);
+    localStorage.setItem('netto:notifications', JSON.stringify(updated));
+  };
   const NAV = [
     { id: 'overview', label: lang === 'th' ? 'แดชบอร์ด' : 'Dashboard',  icon: <Icon.Grid size={12}/> },
     { id: 'holdings', label: lang === 'th' ? 'พอร์ต'     : 'Holdings',    icon: <Icon.Bars size={12}/> },
@@ -179,10 +201,10 @@ function TopNav({ page, setPage }) {
             className={`relative w-9 h-9 bg-card border border-line rounded-full flex items-center justify-center text-ink-700 hover:text-ink-900 hover:bg-surface-soft cursor-pointer transition-colors shadow-card ${open === 'bell' ? 'border-brand text-brand' : ''}`}
           >
             <Icon.Bell size={14}/>
-            <span className="absolute top-2 right-2.5 w-1.5 h-1.5 rounded-full bg-loss"></span>
+            {unreadCount > 0 && <span className="absolute top-2 right-2.5 w-1.5 h-1.5 rounded-full bg-loss"></span>}
           </button>
           <Dropdown open={open === 'bell'} onClose={close}>
-            <NotificationsPopover lang={lang} onClose={close}/>
+            <NotificationsPopover lang={lang} notifications={notifications} onMarkAllRead={markAllRead} onDismiss={dismiss} onClose={close}/>
           </Dropdown>
         </div>
 
@@ -331,23 +353,20 @@ function SharePopover({ lang, nav, onClose }) {
   );
 }
 
-function NotificationsPopover({ lang, onClose }) {
-  const items = [
-    { id: 1, tone: 'gain',  th: 'ปันผล AAPL ฿1,820',          en: 'AAPL dividend ฿1,820',          sub: lang === 'th' ? '2 ชั่วโมงที่แล้ว' : '2 hours ago', unread: true },
-    { id: 2, tone: 'warn',  th: 'พอร์ตเบี่ยง 3.4% จากเป้า',   en: 'Allocation drift +3.4%',        sub: lang === 'th' ? 'เช้านี้' : 'This morning', unread: true },
-    { id: 3, tone: 'brand', th: 'BTC ถึงราคาแจ้งเตือน',       en: 'BTC hit price alert',           sub: lang === 'th' ? 'เมื่อวาน' : 'Yesterday', unread: true },
-    { id: 4, tone: 'loss',  th: 'NVDA ลด 4.2%',                en: 'NVDA down 4.2%',                sub: lang === 'th' ? '2 วันก่อน' : '2 days ago', unread: false },
-    { id: 5, tone: 'gain',  th: 'รายงานรายสัปดาห์พร้อมแล้ว',   en: 'Weekly report ready',           sub: lang === 'th' ? '3 วันก่อน' : '3 days ago', unread: false },
-  ];
+function NotificationsPopover({ lang, notifications, onMarkAllRead, onDismiss, onClose }) {
   return (
     <PopoverCard w="w-80">
       <div className="px-3 py-2.5 border-b border-line flex items-center justify-between">
         <div className="text-[12px] font-semibold text-ink-900">{lang === 'th' ? 'การแจ้งเตือน' : 'Notifications'}</div>
-        <button onClick={onClose} className="text-[11px] text-brand hover:underline cursor-pointer">{lang === 'th' ? 'อ่านทั้งหมด' : 'Mark all read'}</button>
+        {notifications.some(n => n.unread) && (
+          <button onClick={onMarkAllRead} className="text-[11px] text-brand hover:underline cursor-pointer">{lang === 'th' ? 'อ่านทั้งหมด' : 'Mark all read'}</button>
+        )}
       </div>
       <div className="max-h-80 overflow-y-auto scroll-thin">
-        {items.map(it => (
-          <div key={it.id} className={`flex items-start gap-3 px-3 py-2.5 border-b border-line/40 hover:bg-surface-soft cursor-pointer transition-colors ${it.unread ? '' : 'opacity-70'}`}>
+        {notifications.length === 0 ? (
+          <div className="p-6 text-center text-ink-500 text-[12px]">{lang === 'th' ? 'ไม่มีการแจ้งเตือนใหม่' : 'No new notifications'}</div>
+        ) : notifications.map(it => (
+          <div key={it.id} onClick={() => onDismiss(it.id)} className={`flex items-start gap-3 px-3 py-2.5 border-b border-line/40 hover:bg-surface-soft cursor-pointer transition-colors ${it.unread ? '' : 'opacity-70'}`}>
             <span className={`w-1.5 h-1.5 rounded-full mt-1.5 shrink-0 ${it.unread ? 'bg-loss' : 'bg-transparent'}`}></span>
             <div className={`w-7 h-7 rounded-full bg-${it.tone}-soft text-${it.tone} flex items-center justify-center shrink-0`}>
               <Icon.Bell size={12}/>
