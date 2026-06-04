@@ -238,18 +238,32 @@ function AddToWatchlistModal({ open, lang, existing, onClose, onSave }) {
       if (form.cls === 'crypto' && !queryTicker.endsWith('-USD')) queryTicker += '-USD';
       
       const url = `https://query1.finance.yahoo.com/v8/finance/chart/${queryTicker}?interval=1d&range=1d`;
-      const proxiedUrl = `https://api.allorigins.win/raw?url=${encodeURIComponent(url)}`;
+      const proxies = [
+        `https://api.allorigins.win/get?url=${encodeURIComponent(url)}`,
+        `https://api.codetabs.com/v1/proxy/?quest=${encodeURIComponent(url)}`
+      ];
       
-      const res = await fetch(proxiedUrl);
-      if (res.ok) {
-        const data = await res.json();
-        const meta = data?.chart?.result?.[0]?.meta;
-        if (meta) {
-          update({ 
-            name: meta.shortName || meta.longName || form.name,
-            price: (meta.regularMarketPrice || '').toString()
-          });
-        }
+      let data = null;
+      for (const p of proxies) {
+        try {
+          const controller = new AbortController();
+          const id = setTimeout(() => controller.abort(), 4000);
+          const res = await fetch(p, { signal: controller.signal });
+          clearTimeout(id);
+          if (res.ok) {
+            const raw = await res.json();
+            data = raw.contents ? JSON.parse(raw.contents) : raw;
+            break;
+          }
+        } catch (e) {}
+      }
+      
+      const meta = data?.chart?.result?.[0]?.meta;
+      if (meta) {
+        update({ 
+          name: meta.shortName || meta.longName || form.name,
+          price: (meta.regularMarketPrice || '').toString()
+        });
       }
     } catch (e) {
       console.warn("Failed to sync ticker data", e);
