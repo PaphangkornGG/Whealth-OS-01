@@ -41,7 +41,12 @@ const BROKERS = {
 };
 
 // target weights for rebalancer
-const TARGET = { us: 0.30, th: 0.18, fund: 0.14, gold: 0.08, crypto: 0.12, cash: 0.18 };
+const DEFAULT_TARGET = { us: 0.30, th: 0.18, fund: 0.14, gold: 0.08, crypto: 0.12, cash: 0.18 };
+let TARGET = { ...DEFAULT_TARGET };
+try {
+  const saved = localStorage.getItem('netto:classTargets');
+  if (saved) TARGET = JSON.parse(saved);
+} catch {}
 
 // 30-day sparkline series helpers (deterministic pseudo-random)
 const rng = (seed) => {
@@ -187,7 +192,7 @@ const TRUE_RETURN_PCT = TOTAL_COST_THB > 0 ? ((TOTAL_THB - TOTAL_COST_THB + TOTA
 const ALLOCATION = Object.values(ASSET_CLASSES).map(c => {
   const sum = ENRICHED.filter(a => a.cls === c.id).reduce((s,a)=> s + a.valueTHB, 0);
   const pct = TOTAL_THB > 0 ? sum / TOTAL_THB : 0;
-  return { ...c, valueTHB: sum, pct, targetPct: TARGET[c.id] || 0, drift: pct - (TARGET[c.id] || 0) };
+  return { ...c, valueTHB: sum, pct, targetPct: window.DataLayer.TARGET[c.id] || 0, drift: pct - (window.DataLayer.TARGET[c.id] || 0) };
 });
 
 // Allocation by broker / app account — only those actually used

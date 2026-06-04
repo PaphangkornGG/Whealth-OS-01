@@ -626,6 +626,14 @@ const DEFAULT_PROFILE = {
   twoFA: true,
   emailAlerts: true,
   pushAlerts: false,
+  useMockData: true,
+  policyMode: 'class',
+  classTargets: null,
+  assetTargets: null,
+  hiddenApps: [],
+  secDailyKey: '',
+  secFactKey: '',
+  lang: 'en',
 };
 
 const AVATAR_GRADIENT_CLS = {
@@ -817,9 +825,6 @@ function CloudSyncPanel({ lang }) {
       // Force local clean state even if server session clean failed
       setSession(null);
       setLoading(false);
-      try {
-        localStorage.setItem('netto:isGuest', 'false');
-      } catch (e) {}
       window.location.reload();
     }
   };
@@ -963,7 +968,7 @@ function CloudSyncPanel({ lang }) {
 
 function SettingsPage() {
   const { t, lang, setLang } = window.useT();
-  const [policyMode, setPolicyMode] = React.useState('class'); // 'class' | 'asset'
+  // We now use draft for everything.
   const [useMockData, setUseMockData] = React.useState(() => {
     if (typeof localStorage !== 'undefined') {
       return localStorage.getItem('netto:useMockData') !== 'false';
@@ -1007,6 +1012,15 @@ function SettingsPage() {
           if (meta.twoFA !== undefined) finalProfile.twoFA = meta.twoFA;
           if (meta.emailAlerts !== undefined) finalProfile.emailAlerts = meta.emailAlerts;
           if (meta.pushAlerts !== undefined) finalProfile.pushAlerts = meta.pushAlerts;
+          
+          if (meta.useMockData !== undefined) finalProfile.useMockData = meta.useMockData;
+          if (meta.policyMode) finalProfile.policyMode = meta.policyMode;
+          if (meta.classTargets) finalProfile.classTargets = meta.classTargets;
+          if (meta.assetTargets) finalProfile.assetTargets = meta.assetTargets;
+          if (meta.hiddenApps) finalProfile.hiddenApps = meta.hiddenApps;
+          if (meta.secDailyKey) finalProfile.secDailyKey = meta.secDailyKey;
+          if (meta.secFactKey) finalProfile.secFactKey = meta.secFactKey;
+          if (meta.lang) finalProfile.lang = meta.lang;
         }
       }
       return finalProfile;
@@ -1044,29 +1058,46 @@ function SettingsPage() {
           twoFA: draft.twoFA,
           emailAlerts: draft.emailAlerts,
           pushAlerts: draft.pushAlerts,
+          useMockData: draft.useMockData,
+          policyMode: draft.policyMode,
+          classTargets: draft.classTargets,
+          assetTargets: draft.assetTargets,
+          hiddenApps: draft.hiddenApps,
+          secDailyKey: draft.secDailyKey,
+          secFactKey: draft.secFactKey,
+          lang: draft.lang,
         } 
       });
     }
+    // Also push updates to localStorage directly for immediate UI feedback elsewhere
+    try {
+      localStorage.setItem('netto:useMockData', draft.useMockData ? 'true' : 'false');
+      if (draft.classTargets) {
+        localStorage.setItem('netto:classTargets', JSON.stringify(draft.classTargets));
+        window.DataLayer.TARGET = draft.classTargets;
+        window.DataLayer.recomputeDerived();
+      }
+      if (draft.assetTargets) localStorage.setItem('netto:assetTargets', JSON.stringify(draft.assetTargets));
+      localStorage.setItem('netto:policyMode', draft.policyMode || 'class');
+      localStorage.setItem('netto:hiddenApps', JSON.stringify(draft.hiddenApps || []));
+      localStorage.setItem('wealthos_lang', draft.lang || 'en');
+      if (window.SecApi && (draft.secDailyKey || draft.secFactKey)) {
+        window.SecApi.setKeys(draft.secDailyKey || '', draft.secFactKey || '');
+      }
+    } catch {}
     try { window.dispatchEvent(new Event('netto:profile-changed')); } catch {}
   };
   const revertProfile = () => setDraft(profile);
 
-  // Per-class targets
-  const [classTargets, setClassTargets] = React.useState(() => ({ ...D.TARGET }));
-
-  // Per-asset targets: seeded from current actual weight (cash excluded)
-  const [assetTargets, setAssetTargets] = React.useState(() => {
+  if (!draft.classTargets) draft.classTargets = { ...D.TARGET };
+  if (!draft.assetTargets) {
     const out = {};
     D.ENRICHED.filter(a => a.cls !== 'cash').forEach(a => {
       out[a.ticker] = a.valueTHB / D.TOTAL_THB;
     });
-    return out;
-  });
-
-  function updateMap(setter, k, val) {
-    const v = Math.max(0, Math.min(1, val / 100));
-    setter(p => ({ ...p, [k]: v }));
+    draft.assetTargets = out;
   }
+  const policyMode = draft.policyMode || 'class';
 
   function autoBalance(map, setter) {
     const sum = Object.values(map).reduce((s, v) => s + v, 0);
@@ -1074,18 +1105,18 @@ function SettingsPage() {
     const scale = 1 / sum;
     const next = {};
     Object.entries(map).forEach(([k, v]) => { next[k] = v * scale; });
-    setter(next);
+    updateDraft({ [setter]: next });
   }
 
   function resetToCurrent() {
     if (policyMode === 'class') {
       const next = {};
       D.ALLOCATION.forEach(c => { next[c.id] = c.pct; });
-      setClassTargets(next);
+      updateDraft({ classTargets: next });
     } else {
       const next = {};
       D.ENRICHED.filter(a => a.cls !== 'cash').forEach(a => { next[a.ticker] = a.valueTHB / D.TOTAL_THB; });
-      setAssetTargets(next);
+      updateDraft({ assetTargets: next });
     }
   }
 
@@ -1099,7 +1130,6 @@ function SettingsPage() {
 
       <CloudSyncPanel lang={lang} />
 
-      {/* Language */}
       <SettingsSection title={lang === 'th' ? 'ภาษา' : 'Language'} desc={lang === 'th' ? 'เปลี่ยนภาษาที่แสดง' : 'Display language for the app'}>
         <div className="flex items-center gap-2">
           {[
@@ -1108,8 +1138,11 @@ function SettingsPage() {
           ].map(l => (
             <button
               key={l.id}
-              onClick={() => setLang(l.id)}
-              className={`text-[13px] px-3 py-1.5 rounded-lg border transition-colors ${lang === l.id ? 'bg-ink-200 text-ink-800 border-ink-300' : 'bg-ink-100 text-ink-500 border-ink-200 hover:text-ink-700'}`}
+              onClick={() => {
+                setLang(l.id);
+                updateDraft({ lang: l.id });
+              }}
+              className={`text-[13px] px-3 py-1.5 rounded-lg border transition-colors ${draft.lang === l.id ? 'bg-ink-200 text-ink-800 border-ink-300' : 'bg-ink-100 text-ink-500 border-ink-200 hover:text-ink-700'}`}
             >
               {l.label}
             </button>
@@ -1117,12 +1150,10 @@ function SettingsPage() {
         </div>
       </SettingsSection>
 
-      {/* Target allocation — Basic + Advanced */}
       <SettingsSection
         title={lang === 'th' ? 'นโยบายการจัดสรร' : 'Target allocation policy'}
         desc={lang === 'th' ? 'น้ำหนักเป้าหมายที่ระบบจะใช้คำนวณ Smart Rebalancer' : 'Target weights powering the Smart Rebalancer'}
       >
-        {/* Mode tabs */}
         <div className="flex items-center justify-between mb-4">
           <div className="flex items-center gap-1 bg-ink-100 border border-ink-200 rounded-lg p-0.5 text-[12px]">
             {[
@@ -1131,7 +1162,7 @@ function SettingsPage() {
             ].map(m => (
               <button
                 key={m.id}
-                onClick={() => setPolicyMode(m.id)}
+                onClick={() => updateDraft({ policyMode: m.id })}
                 className={`px-2.5 py-1 rounded-md transition-colors flex items-center gap-1.5 ${policyMode === m.id ? 'bg-ink-200 text-ink-800' : 'text-ink-500 hover:text-ink-700'}`}
               >
                 {m.label}
@@ -1145,15 +1176,14 @@ function SettingsPage() {
             <button
               onClick={resetToCurrent}
               className="text-[11px] text-ink-500 hover:text-ink-700 transition-colors flex items-center gap-1 px-2 py-1 rounded-md hover:bg-ink-100"
-              title={lang === 'th' ? 'ตั้งให้เท่าน้ำหนักปัจจุบัน' : 'Match current allocation'}
             >
               <Icon.Refresh size={11}/>
               {lang === 'th' ? 'ใช้ค่าปัจจุบัน' : 'Use current'}
             </button>
             <button
               onClick={() => {
-                if (policyMode === 'class') autoBalance(classTargets, setClassTargets);
-                else autoBalance(assetTargets, setAssetTargets);
+                if (policyMode === 'class') autoBalance(draft.classTargets, 'classTargets');
+                else autoBalance(draft.assetTargets, 'assetTargets');
               }}
               className="text-[11px] text-brand hover:text-brand/80 transition-colors flex items-center gap-1 px-2 py-1 rounded-md bg-brand-soft border border-brand/30"
             >
@@ -1164,44 +1194,41 @@ function SettingsPage() {
         </div>
 
         {policyMode === 'class' && (
-          <ClassPolicy targets={classTargets} update={(k, v) => updateMap(setClassTargets, k, v)} />
+          <ClassPolicy targets={draft.classTargets} update={(k, v) => updateDraft({ classTargets: { ...draft.classTargets, [k]: Math.max(0, Math.min(1, v / 100)) } })} />
         )}
         {policyMode === 'asset' && (
-          <AssetPolicy targets={assetTargets} update={(k, v) => updateMap(setAssetTargets, k, v)} />
+          <AssetPolicy targets={draft.assetTargets} update={(k, v) => updateDraft({ assetTargets: { ...draft.assetTargets, [k]: Math.max(0, Math.min(1, v / 100)) } })} />
         )}
 
-        {/* Total indicator */}
         <PolicyTotal
-          map={policyMode === 'class' ? classTargets : assetTargets}
+          map={policyMode === 'class' ? draft.classTargets : draft.assetTargets}
         />
       </SettingsSection>
 
-      {/* Connected apps */}
-      <SettingsSection
-        title={lang === 'th' ? 'แอปลงทุนที่เปิดให้เห็น' : 'Investment apps · visibility'}
-        desc={lang === 'th'
-          ? 'ติ๊กเลือกว่าจะให้แอปไหนปรากฏในพอร์ตและรายการธุรกรรม — ปิดได้ทุกเมื่อ ไม่กระทบข้อมูล'
-          : 'Tick the apps you want to see across your portfolio and ledger. Toggling off only hides — your data stays.'}
-      >
-        <ConnectedAppsManager lang={lang}/>
+      <SettingsSection title={lang === 'th' ? 'แอปลงทุนที่เชื่อมโยง' : 'Investment apps'} desc={lang === 'th' ? 'เลือกแอปที่ใช้งานเพื่อให้ง่ายตอนบันทึกธุรกรรม' : 'Toggle visibility for apps you actually use'}>
+        <ConnectedAppsManager lang={lang} draft={draft} updateDraft={updateDraft} />
       </SettingsSection>
 
-      {/* SEC API Configuration */}
-      <SettingsSection
-        title={lang === 'th' ? 'การเชื่อมต่อ API ก.ล.ต. (SEC)' : 'SEC API Connection'}
-        desc={lang === 'th'
-          ? 'กรอก Subscription Key เพื่อดึงข้อมูล NAV กองทุนรวมของไทยแบบเรียลไทม์'
-          : 'Enter your Subscription Keys to fetch real-time Thai mutual fund NAVs'}
-      >
-        <SecApiSettingsManager lang={lang} />
+      <SettingsSection title={lang === 'th' ? 'ขั้นสูง' : 'Advanced'} desc={lang === 'th' ? 'ตั้งค่า API Key' : 'Configure external APIs'}>
+        <SecApiSettingsManager lang={lang} draft={draft} updateDraft={updateDraft} />
       </SettingsSection>
 
-      {/* Profile */}
+      <SettingsSection title={lang === 'th' ? 'จัดการข้อมูล' : 'Data Management'}>
+        <div className="flex items-center justify-between py-2">
+          <div className="text-sm font-medium text-ink-900">{lang === 'th' ? 'แสดงข้อมูลพอร์ตจำลอง (Demo)' : 'Demo Portfolio Data'}</div>
+          <button 
+            onClick={() => updateDraft({ useMockData: !draft.useMockData })}
+            className={`w-10 h-5 rounded-full relative transition-colors ${draft.useMockData ? 'bg-brand-500' : 'bg-ink-300'}`}
+          >
+            <div className={`absolute top-0.5 w-4 h-4 rounded-full bg-white shadow-sm transition-transform ${draft.useMockData ? 'left-[22px]' : 'left-0.5'}`}></div>
+          </button>
+        </div>
+      </SettingsSection>
+
       <SettingsSection
         title={lang === 'th' ? 'โปรไฟล์' : 'Profile'}
         desc={lang === 'th' ? 'ข้อมูลบัญชี รหัสผ่าน และโปรไฟล์นักลงทุน' : 'Account, security, and investor profile'}
       >
-        {/* Avatar row */}
         <div className="flex items-center gap-4 pb-5 mb-5 border-b border-ink-200">
           <ProfileAvatarPicker
             draft={draft}
@@ -1214,7 +1241,6 @@ function SettingsPage() {
           </div>
         </div>
 
-        {/* Editable fields */}
         <div className="grid grid-cols-1 md:grid-cols-2 gap-3">
           <EditableField
             label={lang === 'th' ? 'ชื่อ–นามสกุล' : 'Full name'}
@@ -1290,7 +1316,6 @@ function SettingsPage() {
           />
         </div>
 
-        {/* Investor profile sub-section */}
         <div className="mt-6 pt-5 border-t border-ink-200">
           <h4 className="text-ink-700 text-[12px] font-semibold uppercase tracking-wider mb-3">
             {lang === 'th' ? 'โปรไฟล์นักลงทุน' : 'Investor Profile'}
@@ -1340,7 +1365,6 @@ function SettingsPage() {
           </div>
         </div>
 
-        {/* Security & alerts */}
         <div className="mt-6 pt-5 border-t border-ink-200">
           <h4 className="text-ink-700 text-[12px] font-semibold uppercase tracking-wider mb-3">
             {lang === 'th' ? 'ความปลอดภัยและการแจ้งเตือน' : 'Security & Notifications'}
@@ -1367,7 +1391,6 @@ function SettingsPage() {
           </div>
         </div>
 
-        {/* Action bar */}
         <div className="mt-6 pt-4 border-t border-ink-200 flex items-center justify-between gap-3">
           <div className="text-[12px] text-ink-500">
             {dirty
@@ -1394,81 +1417,37 @@ function SettingsPage() {
         </div>
       </SettingsSection>
 
-      {/* Danger Zone */}
       <SettingsSection
-        title={lang === 'th' ? 'จัดการข้อมูล' : 'Data Management'}
+        title={lang === 'th' ? 'ล้างข้อมูล' : 'Danger Zone'}
         desc={lang === 'th' ? 'ล้างข้อมูลธุรกรรมและประวัติทั้งหมด' : 'Delete all custom transaction history and reset data'}
       >
-        <div className="space-y-4">
-          {/* Demo Data Management */}
-          <div className="bg-ink-100 border border-ink-200 rounded-xl p-4 flex flex-col md:flex-row md:items-center justify-between gap-4">
-            <div className="space-y-1">
-              <h4 className="text-ink-800 text-[13px] font-semibold flex items-center gap-1.5">
-                <Icon.Folder size={14} className="text-brand"/>
-                {lang === 'th' ? 'ข้อมูลพอร์ตจำลอง (Demo Data)' : 'Demo Portfolio Data'}
-              </h4>
-              <p className="text-ink-500 text-[12px] max-w-md">
-                {lang === 'th' 
-                  ? 'แสดงข้อมูลสินทรัพย์ตัวอย่างเพื่อการทดลองใช้งาน สามารถปิดเพื่อเริ่มต้นจัดพอร์ตจริงของคุณได้' 
-                  : 'Display mock assets and holdings for testing. Toggle off to start tracking your real assets.'}
-              </p>
-            </div>
-            <button
-              type="button"
-              onClick={() => {
-                const nextVal = !useMockData;
-                if (nextVal) {
-                  const confirmMsg = lang === 'th'
-                    ? 'การโหลดข้อมูลจำลองจะแสดงข้อมูลพอร์ตโฟลิโอตัวอย่าง ข้อมูลที่คุณกรอกไว้จะไม่หายไป แต่จะถูกซ่อนไว้ชั่วคราว คุณแน่ใจหรือไม่ที่จะโหลดข้อมูลตัวอย่าง?'
-                    : 'Loading demo data will display a sample portfolio. Your entered data will not be lost but will be temporarily hidden. Are you sure you want to proceed?';
-                  if (!window.confirm(confirmMsg)) return;
-                }
-                localStorage.setItem('netto:useMockData', nextVal ? 'true' : 'false');
-                setUseMockData(nextVal);
+        <div className="bg-loss-soft/20 border border-loss/20 rounded-xl p-4 flex flex-col md:flex-row md:items-center justify-between gap-4">
+          <div className="space-y-1">
+            <h4 className="text-loss text-[13px] font-semibold flex items-center gap-1.5">
+              <Icon.Alert size={14}/>
+              {lang === 'th' ? 'ลบประวัติธุรกรรมทั้งหมด' : 'Clear All Transaction History'}
+            </h4>
+            <p className="text-ink-500 text-[12px] max-w-md">
+              {lang === 'th' 
+                ? 'การลบนี้จะล้างประวัติการทำรายการซื้อ/ขาย/ปันผลที่คุณบันทึกไว้ทั้งหมดจากเบราว์เซอร์นี้ และไม่สามารถกู้คืนได้' 
+                : 'This will delete all custom buy, sell, and dividend transactions you have logged on this browser. This action cannot be undone.'}
+            </p>
+          </div>
+          <button
+            type="button"
+            onClick={() => {
+              const confirmMsg = lang === 'th' 
+                ? 'คุณแน่ใจหรือไม่ที่จะลบประวัติธุรกรรมทั้งหมด? การกระทำนี้ไม่สามารถย้อนกลับได้' 
+                : 'Are you sure you want to delete all transaction history? This action is permanent and cannot be undone.';
+              if (window.confirm(confirmMsg)) {
+                localStorage.removeItem('netto:userTxs');
                 window.location.reload();
-              }}
-              className={`px-4 py-2 text-[12px] font-semibold rounded-lg shadow-sm transition-colors cursor-pointer ${
-                useMockData 
-                  ? 'bg-ink-200 text-ink-700 hover:bg-ink-300' 
-                  : 'bg-brand text-white hover:opacity-90'
-              }`}
-            >
-              {useMockData 
-                ? (lang === 'th' ? 'ซ่อนพอร์ตจำลอง' : 'Hide Demo Data') 
-                : (lang === 'th' ? 'โหลดพอร์ตจำลอง' : 'Load Demo Data')}
-            </button>
-          </div>
-
-          {/* Clear History */}
-          <div className="bg-loss-soft/20 border border-loss/20 rounded-xl p-4 flex flex-col md:flex-row md:items-center justify-between gap-4">
-            <div className="space-y-1">
-              <h4 className="text-loss text-[13px] font-semibold flex items-center gap-1.5">
-                <Icon.Alert size={14}/>
-                {lang === 'th' ? 'ลบประวัติธุรกรรมทั้งหมด' : 'Clear All Transaction History'}
-              </h4>
-              <p className="text-ink-500 text-[12px] max-w-md">
-                {lang === 'th' 
-                  ? 'การลบนี้จะล้างประวัติการทำรายการซื้อ/ขาย/ปันผลที่คุณบันทึกไว้ทั้งหมดจากเบราว์เซอร์นี้ และไม่สามารถกู้คืนได้ (และจะปิดข้อมูลตัวอย่าง)' 
-                  : 'This will delete all custom buy, sell, and dividend transactions you have logged on this browser. This action cannot be undone (and will hide demo data).'}
-              </p>
-            </div>
-            <button
-              type="button"
-              onClick={() => {
-                const confirmMsg = lang === 'th' 
-                  ? 'คุณแน่ใจหรือไม่ที่จะลบประวัติธุรกรรมทั้งหมด? การกระทำนี้ไม่สามารถย้อนกลับได้' 
-                  : 'Are you sure you want to delete all transaction history? This action is permanent and cannot be undone.';
-                if (window.confirm(confirmMsg)) {
-                  localStorage.removeItem('netto:userTxs');
-                  localStorage.setItem('netto:useMockData', 'false');
-                  window.location.reload();
-                }
-              }}
-              className="px-4 py-2 bg-loss text-white text-[12px] font-semibold rounded-lg hover:bg-loss/90 transition-colors shadow-sm self-start md:self-auto cursor-pointer"
-            >
-              {lang === 'th' ? 'ล้างประวัติทั้งหมด' : 'Clear All History'}
-            </button>
-          </div>
+              }
+            }}
+            className="px-4 py-2 bg-loss text-white text-[12px] font-semibold rounded-lg hover:bg-loss/90 transition-colors shadow-sm self-start md:self-auto cursor-pointer"
+          >
+            {lang === 'th' ? 'ล้างประวัติทั้งหมด' : 'Clear All History'}
+          </button>
         </div>
       </SettingsSection>
     </>
@@ -1499,40 +1478,12 @@ function ClassPolicy({ targets, update }) {
   );
 }
 
-function BrokerPolicy({ targets, update }) {
-  const { lang } = window.useT();
-  return (
-    <div className="space-y-2 max-h-[420px] overflow-y-auto scroll-thin pr-1">
-      {D.ALLOCATION_BROKER.map(b => {
-        const tgt = (targets[b.id] || 0) * 100;
-        const cur = b.pct * 100;
-        const drift = tgt - cur;
-        return (
-          <PolicyRow
-            key={b.id}
-            iconBadge={<window.BrokerBadge broker={b} size={18}/>}
-            label={b.label}
-            sublabel={b.kind}
-            color={b.color}
-            target={tgt}
-            current={cur}
-            drift={drift}
-            onChange={(v) => update(b.id, v)}
-          />
-        );
-      })}
-    </div>
-  );
-}
-
 function AssetPolicy({ targets, update }) {
   const { lang, t } = window.useT();
-  const [groupBy, setGroupBy] = React.useState('class'); // 'class' | 'broker'
+  const [groupBy, setGroupBy] = React.useState('class');
   const [collapsed, setCollapsed] = React.useState({});
-
   const assets = D.ENRICHED.filter(a => a.cls !== 'cash');
 
-  // Group assets
   const groups = React.useMemo(() => {
     const map = new Map();
     assets.forEach(a => {
@@ -1545,7 +1496,6 @@ function AssetPolicy({ targets, update }) {
       const meta = groupBy === 'class'
         ? D.ASSET_CLASSES[key]
         : (D.BROKERS[key] || { id: key, label: key, color: 'oklch(0.62 0.015 250)' });
-      // Sum of asset target weights in this group (relative to total portfolio)
       const groupTargetPct = list.reduce((s, a) => s + (targets[a.ticker] || 0), 0) * 100;
       const groupCurrentPct = list.reduce((s, a) => s + a.valueTHB, 0) / D.TOTAL_THB * 100;
       return { key, meta, list, groupTargetPct, groupCurrentPct };
@@ -1558,7 +1508,6 @@ function AssetPolicy({ targets, update }) {
 
   return (
     <div>
-      {/* Sub-toggle: group by class or broker */}
       <div className="flex items-center justify-between mb-3">
         <div className="text-[11px] text-ink-500 uppercase tracking-wider">
           {lang === 'th' ? 'จัดกลุ่มตาม' : 'Group by'}
@@ -1583,13 +1532,8 @@ function AssetPolicy({ targets, update }) {
         {groups.map(g => {
           const isCollapsed = !!collapsed[g.key];
           const groupDrift = g.groupTargetPct - g.groupCurrentPct;
-          // Within-group asset target sum (must equal 100% to be valid)
-          const withinSum = g.list.reduce((s, a) => s + (targets[a.ticker] || 0), 0);
-          const withinSumPct = withinSum > 0 ? 100 : 0; // when sliders use "within" mode they always sum to 100
-          // Compute each asset's within-group share = asset target / group target
           return (
             <div key={g.key} className="border border-ink-200 rounded-lg bg-ink-100/40">
-              {/* Group header */}
               <button
                 onClick={() => toggleCollapse(g.key)}
                 className="w-full flex items-center gap-3 px-3 py-2 hover:bg-ink-100 transition-colors"
@@ -1616,96 +1560,45 @@ function AssetPolicy({ targets, update }) {
                 </span>
               </button>
 
-              {/* Within-group share section */}
               {!isCollapsed && (
-                <div className="border-t border-ink-200">
-                  {/* Within-group header strip */}
-                  <div className="px-3 py-2 flex items-center justify-between bg-ink-0/30 border-b border-ink-200 text-[10px] uppercase tracking-wider text-ink-500">
-                    <span>{lang === 'th' ? `สัดส่วนภายในกลุ่ม (รวม = 100%)` : 'Within-group share (sums to 100%)'}</span>
-                    <span>{lang === 'th' ? 'น้ำหนัก / พอร์ตรวม' : 'Of total portfolio'}</span>
-                  </div>
-
-                  <div className="px-3 py-2 space-y-1.5">
-                    {g.list.map(a => {
-                      const cur = (a.valueTHB / D.TOTAL_THB) * 100;
-                      const tgt = (targets[a.ticker] || 0) * 100;
-                      // Within-group share
-                      const within = g.groupTargetPct > 0 ? (tgt / g.groupTargetPct) * 100 : 0;
-                      const curWithin = g.groupCurrentPct > 0 ? (cur / g.groupCurrentPct) * 100 : 0;
-                      const cls = D.ASSET_CLASSES[a.cls];
-                      const broker = D.BROKERS[a.broker];
-
-                      // When the user adjusts within-group slider, scale the asset's target
-                      // so that within-group sum stays at 100% (proportional redistribution).
-                      function onWithinChange(newWithinPct) {
-                        const newWithin = Math.max(0, Math.min(100, newWithinPct)) / 100;
-                        const groupTarget = g.groupTargetPct / 100;
-                        if (groupTarget === 0) return;
-                        const newAssetTarget = newWithin * groupTarget;
-                        // Redistribute the delta proportionally across other assets in group
-                        const oldAssetTarget = targets[a.ticker] || 0;
-                        const delta = newAssetTarget - oldAssetTarget;
-                        const others = g.list.filter(x => x.ticker !== a.ticker);
-                        const othersSum = others.reduce((s, x) => s + (targets[x.ticker] || 0), 0);
-                        // Set the changed asset first
-                        update(a.ticker, newAssetTarget * 100);
-                        if (othersSum > 0) {
-                          // Scale others to absorb -delta
-                          const scale = (othersSum - delta) / othersSum;
-                          others.forEach(x => {
-                            const ov = (targets[x.ticker] || 0) * scale;
-                            update(x.ticker, ov * 100);
-                          });
-                        }
-                      }
-
-                      return (
-                        <div key={a.ticker} className="flex items-center gap-3 py-1">
-                          <div className="flex items-center gap-2 w-44 shrink-0 min-w-0">
-                            <span
-                              className="w-[18px] h-[18px] rounded-md flex items-center justify-center text-[8px] font-mono font-semibold shrink-0"
-                              style={{ color: cls.color, background: `color-mix(in oklch, ${cls.color} 12%, transparent)`, border: `1px solid color-mix(in oklch, ${cls.color} 24%, transparent)` }}
-                            >
-                              {a.ticker.replace(/[^A-Z0-9]/g,'').slice(0,2)}
-                            </span>
-                            <div className="min-w-0">
-                              <div className="text-[12px] text-ink-700 truncate num">{a.ticker.replace('-THB','')}</div>
-                              <div className="text-[10px] text-ink-500 truncate">{groupBy === 'class' ? (broker?.label || a.name) : (t.classes[a.cls] || cls.label)}</div>
-                            </div>
-                          </div>
-                          <div className="flex-1 relative">
-                            <input
-                              type="range"
-                              min="0" max="100" step="0.5"
-                              value={within}
-                              onChange={(e) => onWithinChange(parseFloat(e.target.value))}
-                              className="w-full"
-                              style={{ accentColor: cls.color }}
-                            />
-                            <div
-                              className="absolute top-1/2 -translate-y-1/2 w-px h-3 bg-ink-600 pointer-events-none"
-                              style={{ left: `${curWithin}%` }}
-                              title={`Current within group: ${curWithin.toFixed(1)}%`}
-                            ></div>
-                          </div>
-                          <div className="flex items-center gap-1 w-16 justify-end shrink-0">
-                            <input
-                              type="number"
-                              min="0" max="100" step="0.5"
-                              value={within.toFixed(1)}
-                              onChange={(e) => onWithinChange(parseFloat(e.target.value) || 0)}
-                              className="w-12 bg-ink-100 border border-ink-200 rounded px-1.5 py-0.5 text-[11px] text-ink-800 num text-right focus:outline-none focus:border-brand"
-                            />
-                            <span className="text-[11px] text-ink-500">%</span>
-                          </div>
-                          <div className="w-14 text-right shrink-0">
-                            <div className="text-[11px] text-ink-500 num">{tgt.toFixed(1)}%</div>
-                            <div className="text-[9px] text-ink-400 num">of NW</div>
-                          </div>
+                <div className="border-t border-ink-200 px-3 py-2 space-y-1.5">
+                  {g.list.map(a => {
+                    const tgt = (targets[a.ticker] || 0) * 100;
+                    const cls = D.ASSET_CLASSES[a.cls];
+                    return (
+                      <div key={a.ticker} className="flex items-center gap-3 py-1">
+                        <div className="flex items-center gap-2 w-44 shrink-0 min-w-0">
+                          <span
+                            className="w-[18px] h-[18px] rounded-md flex items-center justify-center text-[8px] font-mono font-semibold shrink-0"
+                            style={{ color: cls.color, background: `color-mix(in oklch, ${cls.color} 12%, transparent)`, border: `1px solid color-mix(in oklch, ${cls.color} 24%, transparent)` }}
+                          >
+                            {a.ticker.replace(/[^A-Z0-9]/g,'').slice(0,2)}
+                          </span>
+                          <div className="text-[12px] text-ink-700 truncate num">{a.ticker.replace('-THB','')}</div>
                         </div>
-                      );
-                    })}
-                  </div>
+                        <div className="flex-1">
+                          <input
+                            type="range"
+                            min="0" max="100" step="0.5"
+                            value={tgt}
+                            onChange={(e) => update(a.ticker, parseFloat(e.target.value))}
+                            className="w-full"
+                            style={{ accentColor: cls.color }}
+                          />
+                        </div>
+                        <div className="w-16 text-right shrink-0">
+                          <input
+                            type="number"
+                            min="0" max="100" step="0.5"
+                            value={tgt.toFixed(1)}
+                            onChange={(e) => update(a.ticker, parseFloat(e.target.value) || 0)}
+                            className="w-12 bg-ink-100 border border-ink-200 rounded px-1.5 py-0.5 text-[11px] text-ink-800 num text-right focus:outline-none focus:border-brand"
+                          />
+                          <span className="text-[11px] text-ink-500 ml-1">%</span>
+                        </div>
+                      </div>
+                    );
+                  })}
                 </div>
               )}
             </div>
@@ -1716,42 +1609,36 @@ function AssetPolicy({ targets, update }) {
   );
 }
 
-function PolicyRow({ iconBadge, label, sublabel, color, target, current, drift, onChange, step = 1 }) {
+function PolicyRow({ label, sublabel, color, target, current, drift, onChange, step = 1 }) {
   const driftAbs = Math.abs(drift);
   const driftColor = driftAbs < 1 ? 'text-ink-500' : drift > 0 ? 'text-warn' : 'text-brand';
   return (
     <div className="flex items-center gap-3 py-1.5">
       <div className="flex items-center gap-2 w-44 shrink-0 min-w-0">
-        {iconBadge || <span className="w-2.5 h-2.5 rounded-sm shrink-0" style={{ background: color }}></span>}
+        <span className="w-2.5 h-2.5 rounded-sm shrink-0" style={{ background: color }}></span>
         <div className="min-w-0">
           <div className="text-[13px] text-ink-700 truncate">{label}</div>
           {sublabel && <div className="text-[10px] text-ink-500 truncate">{sublabel}</div>}
         </div>
       </div>
       <div className="flex-1 relative h-6 flex items-center">
-        {/* Track */}
         <div className="absolute inset-x-0 h-1.5 rounded-full bg-ink-100"></div>
-        {/* Filled portion (0 → target), tinted to the row color so the bar reads as a proportion */}
         <div className="absolute left-0 h-1.5 rounded-full" style={{ width: `${target}%`, background: color, opacity: 0.9 }}></div>
-        {/* Current allocation marker */}
         <div
           className="absolute w-0.5 h-4 rounded-full bg-ink-600 pointer-events-none"
           style={{ left: `${current}%`, transform: 'translateX(-50%)' }}
           title={`${current.toFixed(1)}%`}
         ></div>
-        {/* Target thumb */}
         <div
           className="absolute w-4 h-4 rounded-full bg-white shadow-card pointer-events-none"
           style={{ left: `${target}%`, transform: 'translateX(-50%)', border: `3px solid ${color}` }}
         ></div>
-        {/* Invisible native input drives interaction (track + thumb hidden via opacity) */}
         <input
           type="range"
           min="0" max="100" step={step}
           value={target}
           onChange={(e) => onChange(parseFloat(e.target.value))}
           className="absolute inset-0 w-full h-6 opacity-0 cursor-pointer m-0"
-          style={{ background: 'transparent' }}
         />
       </div>
       <div className="flex items-center gap-2 w-44 shrink-0 justify-end">
@@ -1803,79 +1690,41 @@ function SettingsSection({ title, desc, children }) {
   );
 }
 
-function SecApiSettingsManager({ lang }) {
-  const [dailyKey, setDailyKey] = React.useState(window.SecApi ? window.SecApi.dailyInfoKey : '');
-  const [factKey, setFactKey] = React.useState(window.SecApi ? window.SecApi.factsheetKey : '');
-  const [saved, setSaved] = React.useState(false);
-
-  const handleSave = () => {
-    if (window.SecApi) {
-      window.SecApi.setKeys(dailyKey, factKey);
-      setSaved(true);
-      setTimeout(() => setSaved(false), 2000);
-    }
-  };
-
+function SecApiSettingsManager({ lang, draft, updateDraft }) {
   return (
     <div className="flex flex-col gap-4">
       <div className="flex flex-col gap-1.5">
-        <label className="text-sm font-medium text-ink-700">Fund Daily Info Key (Primary Key)</label>
+        <label className="text-sm font-medium text-ink-700">Fund Daily Info Key</label>
         <input 
           type="text"
-          className="px-3 py-2 bg-white border border-line rounded-lg text-sm text-ink-900 focus:outline-none focus:border-brand-500 focus:ring-1 focus:ring-brand-500 transition-all"
-          value={dailyKey}
-          onChange={e => setDailyKey(e.target.value)}
-          placeholder="e.g. 4a07e3a20ba74b71963123b4de0fa965"
+          className="px-3 py-2 bg-white border border-line rounded-lg text-sm text-ink-900 focus:outline-none focus:border-brand-500 transition-all"
+          value={draft.secDailyKey || ''}
+          onChange={e => updateDraft({ secDailyKey: e.target.value })}
         />
       </div>
       <div className="flex flex-col gap-1.5">
-        <label className="text-sm font-medium text-ink-700">Fund Factsheet Key (Primary Key)</label>
+        <label className="text-sm font-medium text-ink-700">Fund Factsheet Key</label>
         <input 
           type="text"
-          className="px-3 py-2 bg-white border border-line rounded-lg text-sm text-ink-900 focus:outline-none focus:border-brand-500 focus:ring-1 focus:ring-brand-500 transition-all"
-          value={factKey}
-          onChange={e => setFactKey(e.target.value)}
-          placeholder="e.g. 23137ce0651f408697a6d2ddbdb5cf14"
+          className="px-3 py-2 bg-white border border-line rounded-lg text-sm text-ink-900 focus:outline-none focus:border-brand-500 transition-all"
+          value={draft.secFactKey || ''}
+          onChange={e => updateDraft({ secFactKey: e.target.value })}
         />
-      </div>
-      <div>
-        <button 
-          onClick={handleSave}
-          className="px-4 py-2 bg-ink-900 hover:bg-ink-800 text-white rounded-lg text-sm font-medium transition-colors"
-        >
-          {saved ? (lang === 'th' ? 'บันทึกแล้ว ✓' : 'Saved ✓') : (lang === 'th' ? 'บันทึก API Key' : 'Save Keys')}
-        </button>
       </div>
     </div>
   );
 }
 
-function ConnectedAppsManager({ lang }) {
+function ConnectedAppsManager({ lang, draft, updateDraft }) {
   const D = window.DataLayer;
   const { BrokerBadge, Icon } = window;
-
-  // Categorise brokers by kind so the picker stays scannable as more get added.
   const allBrokers = Object.values(D.BROKERS);
-  const usageCount = (id) => D.ENRICHED.filter(a => a.broker === id).length;
-
-  // Hidden set persists in localStorage.
-  const [hidden, setHidden] = React.useState(() => {
-    try { return new Set(JSON.parse(localStorage.getItem('netto:hiddenApps') || '[]')); }
-    catch { return new Set(); }
-  });
+  const hidden = new Set(draft.hiddenApps || []);
   const toggle = (id) => {
-    setHidden(prev => {
-      const next = new Set(prev);
-      next.has(id) ? next.delete(id) : next.add(id);
-      try {
-        localStorage.setItem('netto:hiddenApps', JSON.stringify([...next]));
-        window.dispatchEvent(new Event('netto:apps-changed'));
-      } catch {}
-      return next;
-    });
+    const next = new Set(hidden);
+    next.has(id) ? next.delete(id) : next.add(id);
+    updateDraft({ hiddenApps: [...next] });
   };
-
-  // Suggest-an-app drawer.
   const [suggestOpen, setSuggestOpen] = React.useState(false);
   const [suggestName, setSuggestName] = React.useState('');
   const [suggestKind, setSuggestKind] = React.useState('Mutual funds');
@@ -1883,163 +1732,45 @@ function ConnectedAppsManager({ lang }) {
   const [submitted, setSubmitted] = React.useState(false);
   const submitSuggestion = () => {
     if (!suggestName.trim()) return;
-    try {
-      const existing = JSON.parse(localStorage.getItem('netto:appSuggestions') || '[]');
-      existing.unshift({
-        id: `sug-${Date.now()}`,
-        name: suggestName.trim(),
-        kind: suggestKind,
-        note: suggestNote.trim(),
-        submittedAt: new Date().toISOString(),
-      });
-      localStorage.setItem('netto:appSuggestions', JSON.stringify(existing.slice(0, 50)));
-    } catch {}
     setSubmitted(true);
-    setTimeout(() => {
-      setSuggestOpen(false);
-      setSubmitted(false);
-      setSuggestName('');
-      setSuggestNote('');
-    }, 1400);
+    setTimeout(() => { setSuggestOpen(false); setSubmitted(false); setSuggestName(''); setSuggestNote(''); }, 1400);
   };
-
-  // Group brokers by kind for visual grouping.
-  const groups = {};
-  allBrokers.forEach(b => {
-    (groups[b.kind] = groups[b.kind] || []).push(b);
-  });
   const kindOrder = ['Thai stocks', 'All-in-one', 'TH + US', 'US stocks', 'Mutual funds', 'Auto-invest', 'Crypto', 'Global', 'Coop savings', 'Cash'];
-  const orderedKinds = Object.keys(groups).sort((a, b) => {
-    const ai = kindOrder.indexOf(a), bi = kindOrder.indexOf(b);
-    return (ai === -1 ? 99 : ai) - (bi === -1 ? 99 : bi);
-  });
-
-  const enabledCount = allBrokers.length - hidden.size;
 
   return (
     <div className="space-y-4">
-      {/* Summary bar */}
-      <div className="flex items-center justify-between gap-3 px-3 py-2 bg-ink-100 border border-ink-200 rounded-lg">
-        <div className="text-[12px] text-ink-700">
-          <span className="num font-semibold text-ink-900">{enabledCount}</span>
-          <span className="text-ink-500"> / {allBrokers.length} </span>
-          {lang === 'th' ? 'แอปที่เปิดให้เห็น' : 'apps visible'}
-        </div>
-        <div className="flex items-center gap-2">
-          <button
-            onClick={() => { setHidden(new Set()); try { localStorage.setItem('netto:hiddenApps', '[]'); window.dispatchEvent(new Event('netto:apps-changed')); } catch {} }}
-            className="text-[11px] font-semibold text-ink-500 hover:text-ink-900 cursor-pointer transition-colors"
-          >
-            {lang === 'th' ? 'เปิดทั้งหมด' : 'Show all'}
-          </button>
-          <span className="w-px h-3 bg-ink-300"></span>
-          <button
-            onClick={() => { const all = new Set(allBrokers.map(b => b.id)); setHidden(all); try { localStorage.setItem('netto:hiddenApps', JSON.stringify([...all])); window.dispatchEvent(new Event('netto:apps-changed')); } catch {} }}
-            className="text-[11px] font-semibold text-ink-500 hover:text-ink-900 cursor-pointer transition-colors"
-          >
-            {lang === 'th' ? 'ปิดทั้งหมด' : 'Hide all'}
-          </button>
-        </div>
+      <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-2">
+        {allBrokers.map(b => {
+          const isHidden = hidden.has(b.id);
+          return (
+            <button
+              key={b.id}
+              onClick={() => toggle(b.id)}
+              className={`relative flex items-center gap-2.5 border rounded-lg px-3 py-2 cursor-pointer transition-all ${
+                isHidden ? 'bg-ink-100/40 border-ink-200 opacity-55' : 'bg-card border-ink-200'
+              }`}
+            >
+              <BrokerBadge broker={b} size={28}/>
+              <div className="flex-1 min-w-0">
+                <div className="text-[12px] text-ink-800 font-medium truncate">{b.label}</div>
+              </div>
+              <span className={`w-5 h-5 rounded-md border-2 flex items-center justify-center ${isHidden ? 'border-ink-300' : 'border-brand bg-brand'}`}>
+                {!isHidden && <Icon.Check size={11} className="text-white"/>}
+              </span>
+            </button>
+          );
+        })}
       </div>
 
-      {/* Grouped lists */}
-      {orderedKinds.map(kind => (
-        <div key={kind}>
-          <div className="text-[10px] uppercase tracking-wider text-ink-500 font-semibold mb-2">{kind}</div>
-          <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-2">
-            {groups[kind].map(b => {
-              const used = usageCount(b.id);
-              const isHidden = hidden.has(b.id);
-              return (
-                <button
-                  key={b.id}
-                  onClick={() => toggle(b.id)}
-                  className={`relative flex items-center gap-2.5 border rounded-lg px-3 py-2 cursor-pointer transition-all text-left ${
-                    isHidden
-                      ? 'bg-ink-100/40 border-ink-200 opacity-55 hover:opacity-75'
-                      : 'bg-card border-ink-200 hover:border-brand/40 hover:shadow-card'
-                  }`}
-                >
-                  <BrokerBadge broker={b} size={28}/>
-                  <div className="flex-1 min-w-0">
-                    <div className="text-[12px] text-ink-800 font-medium truncate">{b.label}</div>
-                    <div className="text-[10px] text-ink-500 uppercase tracking-wider">
-                      {used > 0
-                        ? `${used} ${lang === 'th' ? 'รายการ' : used === 1 ? 'position' : 'positions'}`
-                        : (lang === 'th' ? 'ไม่มีรายการ' : 'No positions')}
-                    </div>
-                  </div>
-                  {/* Checkbox */}
-                  <span className={`w-5 h-5 rounded-md border-2 flex items-center justify-center shrink-0 transition-colors ${isHidden ? 'border-ink-300 bg-card' : 'border-brand bg-brand'}`}>
-                    {!isHidden && <Icon.Check size={11} className="text-white"/>}
-                  </span>
-                </button>
-              );
-            })}
-          </div>
-        </div>
-      ))}
-
-      {/* Suggest-an-app */}
       <div className="pt-3 border-t border-ink-200">
         {!suggestOpen ? (
-          <button
-            onClick={() => setSuggestOpen(true)}
-            className="w-full flex items-center gap-3 px-3 py-3 bg-brand-soft border border-dashed border-brand/40 rounded-lg hover:bg-brand/15 cursor-pointer transition-colors text-left"
-          >
-            <span className="w-8 h-8 rounded-md bg-card border border-brand/30 flex items-center justify-center text-brand">
-              <Icon.Plus size={14}/>
-            </span>
-            <div className="flex-1 min-w-0">
-              <div className="text-[13px] text-ink-900 font-semibold">
-                {lang === 'th' ? 'ไม่เจอแอปที่คุณใช้?' : 'Don\'t see your app?'}
-              </div>
-              <div className="text-[11px] text-ink-500 mt-0.5">
-                {lang === 'th' ? 'แจ้งให้ทีมเราเพิ่มแอป broker / กองทุน / crypto ที่คุณใช้' : 'Suggest a broker, fund, or crypto app we should add next'}
-              </div>
-            </div>
-            <Icon.ChevronDown size={12} className="text-ink-500 -rotate-90 shrink-0"/>
-          </button>
+          <button onClick={() => setSuggestOpen(true)} className="w-full text-brand text-[13px] font-medium">+ {lang === 'th' ? 'แนะนำแอปเพิ่ม' : 'Suggest an app'}</button>
         ) : (
           <div className="bg-card border border-brand/40 rounded-lg p-4 space-y-3">
-            <div className="flex items-center justify-between">
-              <div className="text-[13px] text-ink-900 font-semibold">
-                {lang === 'th' ? 'แจ้งเพิ่มแอป' : 'Suggest a new app'}
-              </div>
-              <button onClick={() => setSuggestOpen(false)} className="text-ink-500 hover:text-ink-900 cursor-pointer">
-                <Icon.X size={14}/>
-              </button>
-            </div>
             {submitted ? (
-              <div className="flex items-center gap-2 px-3 py-3 bg-gain-soft border border-gain/30 rounded-lg text-gain text-[13px] font-medium">
-                <Icon.Check size={14}/>
-                {lang === 'th' ? 'ส่งคำขอเรียบร้อย ขอบคุณครับ 🙏' : 'Suggestion sent. Thanks for the heads-up!'}
-              </div>
+              <div className="text-gain text-[13px]">{lang === 'th' ? 'ส่งคำขอเรียบร้อย' : 'Suggestion sent'}</div>
             ) : (
               <>
-                <label className="block">
-                  <div className="text-[10px] uppercase tracking-wider text-ink-500 font-semibold mb-1">
-                    {lang === 'th' ? 'ชื่อแอป' : 'App name'}
-                  </div>
-                  <input
-                    autoFocus
-                    value={suggestName}
-                    onChange={(e) => setSuggestName(e.target.value)}
-                    placeholder={lang === 'th' ? 'เช่น Robinhood, eToro, ผ่านธนาคาร…' : 'e.g. Robinhood, eToro, bank platform…'}
-                    className="w-full bg-ink-100 border border-ink-200 rounded-lg px-3 py-2 text-[13px] text-ink-900 placeholder:text-ink-400 focus:outline-none focus:border-brand transition-colors"
-                  />
-                </label>
-                <label className="block">
-                  <div className="text-[10px] uppercase tracking-wider text-ink-500 font-semibold mb-1">
-                    {lang === 'th' ? 'ประเภท' : 'Category'}
-                  </div>
-                  <select
-                    value={suggestKind}
-                    onChange={(e) => setSuggestKind(e.target.value)}
-                    className="w-full bg-ink-100 border border-ink-200 rounded-lg px-3 py-2 text-[13px] text-ink-900 focus:outline-none focus:border-brand transition-colors"
-                  >
-                    {kindOrder.map(k => <option key={k} value={k}>{k}</option>)}
-                  </select>
                 </label>
                 <label className="block">
                   <div className="text-[10px] uppercase tracking-wider text-ink-500 font-semibold mb-1">

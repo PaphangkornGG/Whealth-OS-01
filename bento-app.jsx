@@ -676,39 +676,12 @@ function LoginPortal({ onGuest, lang }) {
           </button>
         </form>
 
-        <div className="relative flex py-3 items-center">
-          <div className="flex-grow border-t border-line2"></div>
-          <span className="flex-shrink mx-4 text-ink-400 text-[11px] uppercase tracking-wider">{lang === 'th' ? 'หรือ' : 'or'}</span>
-          <div className="flex-grow border-t border-line2"></div>
-        </div>
-
-        <button
-          type="button"
-          onClick={onGuest}
-          className="w-full py-2 bg-ink-100 hover:bg-ink-200 border border-line text-ink-700 text-[12px] font-semibold rounded-lg transition-colors cursor-pointer text-center"
-        >
-          {lang === 'th' ? 'ใช้งานแบบบุคคลทั่วไป (Guest Mode)' : 'Continue as Guest'}
-        </button>
       </div>
     </div>
   );
 }
 
 function App() {
-  const [isGuest, setIsGuest] = React.useState(() => {
-    try {
-      return localStorage.getItem('netto:isGuest') === 'true';
-    } catch {
-      return false;
-    }
-  });
-
-  const handleGuest = () => {
-    setIsGuest(true);
-    try {
-      localStorage.setItem('netto:isGuest', 'true');
-    } catch {}
-  };
 
   const [page, setPage] = React.useState(() => {
     try { return localStorage.getItem('wealthos_bento_page') || 'overview'; } catch { return 'overview'; }
@@ -892,6 +865,31 @@ function App() {
       setUser(sessionUser);
 
       if (sessionUser) {
+        // Hydrate preferences from Supabase to localStorage
+        const meta = sessionUser.user_metadata;
+        if (meta) {
+          if (meta.useMockData !== undefined) localStorage.setItem('netto:useMockData', meta.useMockData ? 'true' : 'false');
+          if (meta.hiddenApps) {
+            localStorage.setItem('netto:hiddenApps', JSON.stringify(meta.hiddenApps));
+            window.dispatchEvent(new Event('netto:apps-changed'));
+          }
+          if (meta.lang) {
+            localStorage.setItem('wealthos_lang', meta.lang);
+            window.dispatchEvent(new Event('netto:lang-changed'));
+          }
+          // Set SEC Api keys if available
+          if (window.SecApi && (meta.secDailyKey || meta.secFactKey)) {
+            window.SecApi.setKeys(meta.secDailyKey || '', meta.secFactKey || '');
+          }
+          // We don't overwrite netto:profile here because pages.jsx handles its own hydration, 
+          // but we can put classTargets and assetTargets into a known spot if needed.
+          if (meta.classTargets) {
+            localStorage.setItem('netto:classTargets', JSON.stringify(meta.classTargets));
+            window.DataLayer.TARGET = meta.classTargets;
+          }
+          if (meta.assetTargets) localStorage.setItem('netto:assetTargets', JSON.stringify(meta.assetTargets));
+          if (meta.policyMode) localStorage.setItem('netto:policyMode', meta.policyMode);
+        }
         // Logged in! Fetch transactions from Supabase
         const { data, error } = await supabase
           .from('transactions')
@@ -1067,11 +1065,7 @@ function App() {
       window.AppUser = activeUser;
       setUser(activeUser);
       if (activeUser) {
-        setIsGuest(false);
-        try { localStorage.setItem('netto:isGuest', 'false'); } catch {}
       } else if (event === 'SIGNED_OUT') {
-        setIsGuest(false);
-        try { localStorage.setItem('netto:isGuest', 'false'); } catch {}
       }
       syncWithDbOrLocal();
       window.dispatchEvent(new Event('netto:user-changed'));
@@ -1284,10 +1278,10 @@ function App() {
 
   const langName = (window.localStorage.getItem('wealthos_lang') || 'en').toLowerCase();
 
-  if (!user && !isGuest) {
+  if (!user) {
     return (
       <LangProvider>
-        <LoginPortal onGuest={handleGuest} lang={langName} />
+        <LoginPortal lang={langName} />
       </LangProvider>
     );
   }

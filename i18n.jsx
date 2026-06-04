@@ -451,6 +451,16 @@ function LangProvider({ children }) {
     setLangState(l);
     try { localStorage.setItem('wealthos_lang', l); } catch {}
   }, []);
+  React.useEffect(() => {
+    const handleLangChange = () => {
+      try {
+        const stored = localStorage.getItem('wealthos_lang');
+        if (stored && stored !== lang) setLangState(stored);
+      } catch {}
+    };
+    window.addEventListener('netto:lang-changed', handleLangChange);
+    return () => window.removeEventListener('netto:lang-changed', handleLangChange);
+  }, [lang]);
   const value = React.useMemo(() => ({ t: I18N[lang], lang, setLang }), [lang, setLang]);
   return <LangContext.Provider value={value}>{children}</LangContext.Provider>;
 }
