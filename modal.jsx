@@ -60,6 +60,8 @@ function getLivePrice(tickerInput) {
     'TMBGQG':        { price: 13.2420, ccy: 'THB', broker: 'finnomena' },
     'M-S50':         { price: 24.8420, ccy: 'THB', broker: 'finnomena' },
     'ASP-DIGIBLOC':  { price: 12.5042, ccy: 'THB', broker: 'finnomena' },
+    'ASP-NGF':       { price: 33.325, ccy: 'THB', name: 'Asset Plus Nippon Growth Fund (ASP-NGF)' },
+    'KKP S-PLUS':    { price: 10.4502, ccy: 'THB', name: 'KKP Smart Plus Fund' },
     // Crypto
     'SOL':  { price: 168.40, ccy: 'USD', broker: 'bitkub' },
     'BNB':  { price: 632.20, ccy: 'USD', broker: 'binance_th' },
@@ -116,6 +118,7 @@ const TICKER_SUGGESTIONS = [
   { t: 'KFLTGOVRMF',  n: 'Krungsri LT Government Bond RMF', cls: 'Fund' },
   { t: 'KFHTECH-A',   n: 'Krungsri Hawkish Tech',     cls: 'Fund' },
   { t: 'KT-WTAI',     n: 'Krungthai World Tech AI',   cls: 'Fund' },
+  { t: 'KKP S-PLUS',  n: 'KKP Smart Plus Fund',       cls: 'Fund' },
   { t: 'B-INNOTECH',  n: 'BBL Innovative Tech',       cls: 'Fund' },
   { t: 'ONE-UGG',     n: 'One US Growth',             cls: 'Fund' },
   { t: 'TMBGQG',      n: 'TMB Global Quality Growth', cls: 'Fund' },
@@ -302,9 +305,18 @@ function QuickTxModal({ open, onClose, onSave, prefill }) {
                   setCls(isCrypto ? 'crypto' : 'us');
                 }
               }
+              return; // Add early return if successful
             }
           }
         }
+        
+        // If we reach here, all fetches failed. Reset the stale data so we don't show the wrong company name/price.
+        if (type !== 'dividend') {
+          setPrice('');
+          setPriceSynced(false);
+        }
+        setName(upper);
+        
       } catch (err) {
         if (err.name !== 'AbortError') console.error(err);
       }
