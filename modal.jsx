@@ -572,7 +572,7 @@ function QuickTxModal({ open, onClose, onSave, prefill }) {
                           className="w-full flex items-center justify-between px-3 py-2 hover:bg-ink-200 transition-colors text-left"
                         >
                           <div className="flex items-center gap-3 min-w-0">
-                            <span className="num text-[13px] text-ink-800 font-medium w-20 shrink-0 truncate">{s.t}</span>
+                            <span className="num text-[13px] text-ink-800 font-medium w-32 shrink-0 truncate">{s.t}</span>
                             <span className="text-[12px] text-ink-500 truncate">{s.n}</span>
                           </div>
                           <div className="flex items-center gap-2 shrink-0 pl-2">
