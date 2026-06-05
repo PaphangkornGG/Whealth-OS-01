@@ -410,9 +410,24 @@ function QuickTxModal({ open, onClose, onSave, initialData = null, prefill = nul
                   : 0);
   const grossDividendN = netDividendN + whtN;
   const effectiveWhtRate = grossDividendN > 0 ? (whtN / grossDividendN) : 0;
+  // Merge user's actual portfolio with default suggestions
+  const dynamicSuggestions = React.useMemo(() => {
+    const userAssets = window.DataLayer?.ENRICHED || [];
+    const userSuggestions = userAssets.map(a => ({ t: a.ticker, n: a.name || a.ticker, cls: a.cls }));
+    
+    // Deduplicate against defaults
+    const combined = [...userSuggestions];
+    for (const def of TICKER_SUGGESTIONS) {
+      if (!combined.find(s => s.t === def.t)) {
+        combined.push(def);
+      }
+    }
+    return combined;
+  }, []);
+
   const suggestions = ticker
-    ? TICKER_SUGGESTIONS.filter(s => s.t.toLowerCase().includes(ticker.toLowerCase()) || s.n.toLowerCase().includes(ticker.toLowerCase()))
-    : TICKER_SUGGESTIONS.slice(0, 6);
+    ? dynamicSuggestions.filter(s => s.t.toLowerCase().includes(ticker.toLowerCase()) || s.n.toLowerCase().includes(ticker.toLowerCase()))
+    : dynamicSuggestions.slice(0, 8);
 
   function handleClassChange(newCls) {
     setCls(newCls);
