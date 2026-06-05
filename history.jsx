@@ -108,6 +108,8 @@
       costBasis: costVals,
       set50: set50Vals.map(v => v * (currentTotal / finalSet50)),
       sp500: sp500Vals.map(v => v * (currentTotal / finalSp500)),
+      set50Raw: set50Vals,
+      sp500Raw: sp500Vals,
       dates: dateVals,
       days: times.length,
     };

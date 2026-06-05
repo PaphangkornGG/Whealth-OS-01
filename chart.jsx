@@ -221,10 +221,10 @@ function PerformanceChart({ range, setRange }) {
                 <Row color="oklch(0.62 0.015 250)" label={t.costBasis} value={fmtTHB(data.costBasis[hover])}/>
               )}
               {seriesOn.set50 && (
-                <Row color="oklch(0.78 0.16 152)" label="SET50" value={fmtTHB(data.set50[hover], { compact: true })}/>
+                <Row color="oklch(0.78 0.16 152)" label="SET50" value={fmtNum(data.set50Raw[hover], 2)}/>
               )}
               {seriesOn.sp500 && (
-                <Row color="oklch(0.74 0.14 295)" label="S&P 500" value={fmtTHB(data.sp500[hover], { compact: true })}/>
+                <Row color="oklch(0.74 0.14 295)" label="S&P 500" value={fmtNum(data.sp500Raw[hover], 2)}/>
               )}
             </div>
           </div>
