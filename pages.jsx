@@ -6,13 +6,13 @@ const D = window.DataLayer;
 // ------------------------- Page wrappers -----------------------------
 function PageHeader({ kicker, title, subtitle, action }) {
   return (
-    <div className="flex items-end justify-between fade-up">
+    <div className="flex items-end justify-between fade-up relative z-50">
       <div>
         <div className="text-ink-500 text-[12px] uppercase tracking-wider">{kicker}</div>
         <h1 className="text-ink-800 text-[22px] font-semibold tracking-tight mt-0.5">{title}</h1>
         {subtitle && <p className="text-ink-500 text-[13px] mt-1">{subtitle}</p>}
       </div>
-      {action && <div className="relative z-40">{action}</div>}
+      {action && <div>{action}</div>}
     </div>
   );
 }
