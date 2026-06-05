@@ -191,20 +191,9 @@ function CashflowPage() {
   const { t, lang } = window.useT();
   const I = window.Icon;
 
-  // Page-level period filter. Drives the past chart, the "Received in last N"
-  // KPI, and the forecast horizon. YTD-based metrics (Received YTD, YoC/YoV,
-  // WHT) stay as-is because they're year-to-date or lifetime by convention.
-  const [period, setPeriod] = React.useState(12);
-  const [periodOpen, setPeriodOpen] = React.useState(false);
-  const PERIODS = [
-    { v: 3,  label: t.period3M },
-    { v: 6,  label: t.period6M },
-    { v: 12, label: t.period1Y },
-    { v: 24, label: t.period2Y },
-    { v: 36, label: t.period3Y },
-    { v: 60, label: t.period5Y },
-  ];
-  const currentPeriod = PERIODS.find(p => p.v === period) || PERIODS[2];
+  // Page-level period filter removed as requested by user.
+  // We hardcode it to 12 months (1 year).
+  const period = 12;
 
   const months = ['Jan','Feb','Mar','Apr','May','Jun','Jul','Aug','Sep','Oct','Nov','Dec'];
   const monthsTH = ['ม.ค.','ก.พ.','มี.ค.','เม.ย.','พ.ค.','มิ.ย.','ก.ค.','ส.ค.','ก.ย.','ต.ค.','พ.ย.','ธ.ค.'];
@@ -269,33 +258,6 @@ function CashflowPage() {
         kicker={t.nav.cashflow}
         title={lang === 'th' ? 'กระแสเงินสดจากปันผล' : 'Dividend cashflow'}
         subtitle={lang === 'th' ? 'ประวัติย้อนหลัง + คาดการณ์ล่วงหน้า' : 'Historical and projected income from your portfolio'}
-        action={
-          <div className="relative">
-            <button
-              type="button"
-              onClick={() => setPeriodOpen(o => !o)}
-              className={`flex items-center gap-2 bg-ink-50 border rounded-lg px-3 py-1.5 text-[13px] font-medium transition-colors ${periodOpen ? 'border-ink-300 text-ink-800' : 'border-ink-200 text-ink-700 hover:border-ink-300'}`}
-            >
-              <I.Calendar size={13}/>
-              <span>{currentPeriod.label}</span>
-              <I.ChevronDown size={12} className={`transition-transform ${periodOpen ? 'rotate-180' : ''}`}/>
-            </button>
-            {periodOpen && (
-              <div className="absolute right-0 top-full mt-1.5 bg-ink-0 border border-ink-200 rounded-lg shadow-pop overflow-hidden z-30 min-w-[140px]">
-                {PERIODS.map(p => (
-                  <button
-                    key={p.v}
-                    type="button"
-                    onClick={() => { setPeriod(p.v); setPeriodOpen(false); }}
-                    className={`block w-full text-left px-3 py-1.5 text-[13px] hover:bg-ink-100 transition-colors ${period === p.v ? 'text-warn font-medium bg-warn-soft/40' : 'text-ink-700'}`}
-                  >
-                    {p.label}
-                  </button>
-                ))}
-              </div>
-            )}
-          </div>
-        }
       />
 
       {/* Top KPIs */}
