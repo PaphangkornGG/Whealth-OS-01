@@ -203,11 +203,13 @@ function AddToWatchlistModal({ open, lang, existing, onClose, onSave }) {
   const [form, setForm] = React.useState(empty);
   const firstRef = React.useRef(null);
   const [fetching, setFetching] = React.useState(false);
+  const [manualType, setManualType] = React.useState(false);
 
   React.useEffect(() => {
     if (open) {
       setForm(empty());
       setFetching(false);
+      setManualType(false);
       setTimeout(() => firstRef.current?.focus(), 50);
     }
   }, [open]);
@@ -320,7 +322,7 @@ function AddToWatchlistModal({ open, lang, existing, onClose, onSave }) {
                 <button
                   key={k}
                   type="button"
-                  onClick={() => update({ cls: k })}
+                  onClick={() => { update({ cls: k }); setManualType(true); }}
                   className={`text-[11px] py-2 rounded-md border transition-colors ${form.cls === k ? 'bg-brand-soft border-brand/40 text-brand font-medium' : 'bg-surface-soft border-line text-ink-700 hover:border-ink-300'}`}
                 >
                   {meta.label[lang] || meta.label.en}
@@ -336,7 +338,23 @@ function AddToWatchlistModal({ open, lang, existing, onClose, onSave }) {
                 <input
                   ref={firstRef}
                   value={form.ticker}
-                  onChange={(e) => update({ ticker: e.target.value.toUpperCase().replace(/[^A-Z0-9.\-&]/g, ''), price: '', name: '' })}
+                  onChange={(e) => {
+                    const raw = e.target.value.toUpperCase().replace(/[^A-Z0-9.\-&]/g, '');
+                    const patch = { ticker: raw, price: '', name: '' };
+                    
+                    if (!manualType && raw) {
+                      const CRYPTO = ['BTC','ETH','SOL','BNB','XRP','ADA','DOGE'];
+                      const THAI = ['PTT','AOT','KBANK','SCB','BBL','ADVANC','CPALL','TISCO','BDMS','CPN','GULF','DELTA','INTUCH','TRUE','MINT','CRC'];
+                      const US = ['AAPL','MSFT','TSLA','AMZN','GOOGL','GOOG','META','NFLX','NVDA','AMD','INTC','PLTR','COIN'];
+                      
+                      if (CRYPTO.includes(raw) || raw.endsWith('-USD')) patch.cls = 'crypto';
+                      else if (THAI.includes(raw) || raw.endsWith('.BK')) patch.cls = 'th';
+                      else if (US.includes(raw)) patch.cls = 'us';
+                      else if (raw === 'GOLDSPOT' || raw === 'GOLD96.5') patch.cls = 'gold';
+                      else if (raw.includes('-') || raw.includes('&')) patch.cls = 'fund';
+                    }
+                    update(patch);
+                  }}
                   placeholder="AAPL"
                   className="w-full bg-surface-soft border border-line rounded-md px-2.5 py-1.5 text-[13px] text-ink-900 num font-medium uppercase focus:outline-none focus:border-brand"
                 />
