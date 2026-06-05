@@ -227,7 +227,6 @@ const PORTFOLIO_SPARK = (() => {
 
 function recomputeDerived() {
   const D = window.DataLayer || {};
-  window.DataLayer.getLivePrice = getLivePrice;
   window.DataLayer.sparkSeries = sparkSeries;
   D.TOTAL_THB = D.ENRICHED.reduce((s, a) => s + (a.valueTHB || 0), 0);
   D.TOTAL_COST_THB = D.ENRICHED.reduce((s, a) => s + D.toTHB(a.cost || 0, a.ccy), 0);
@@ -295,5 +294,5 @@ window.DataLayer = {
   DAILY_CHANGE_PCT, DAILY_CHANGE_THB, PORTFOLIO_SPARK,
   fmtTHB, fmtNum, fmtPct, fmtUnits, toTHB,
   recomputeDerived,
-  getLivePrice, sparkSeries,
+  sparkSeries,
 };

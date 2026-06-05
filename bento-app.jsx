@@ -968,7 +968,7 @@ function App() {
                 held.spark = [...sibling.spark];
               } else {
                 const base = tx.price || 100;
-                const rawSpark = window.DataLayer.sparkSeries(tx.ticker.charCodeAt(0), 30, 0);
+                const rawSpark = window.DataLayer.sparkSeries((tx.ticker || 'A').charCodeAt(0), 30, 0);
                 const ratio = base / rawSpark[29];
                 held.spark = rawSpark.map(v => v * ratio);
               }
@@ -1052,7 +1052,7 @@ function App() {
                 held.spark = [...sibling.spark];
               } else {
                 const base = tx.price || 100;
-                const rawSpark = window.DataLayer.sparkSeries(tx.ticker.charCodeAt(0), 30, 0);
+                const rawSpark = window.DataLayer.sparkSeries((tx.ticker || 'A').charCodeAt(0), 30, 0);
                 const ratio = base / rawSpark[29];
                 held.spark = rawSpark.map(v => v * ratio);
               }
@@ -1279,7 +1279,7 @@ function App() {
       } else {
         // Generate a synthetic mock sparkline ending near current avgCost or 100
         const base = tx.price || 100;
-        const rawSpark = window.DataLayer.sparkSeries(tx.ticker.charCodeAt(0), 30, 0);
+        const rawSpark = window.DataLayer.sparkSeries((tx.ticker || 'A').charCodeAt(0), 30, 0);
         const ratio = base / rawSpark[29];
         held.spark = rawSpark.map(v => v * ratio);
       }
