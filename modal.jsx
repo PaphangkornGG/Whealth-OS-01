@@ -24,34 +24,7 @@ function getLivePrice(tickerInput) {
   const upper = tickerInput.toUpperCase().trim();
   const found = ENRICHED.find(a => a.ticker === upper || a.ticker.startsWith(upper + '-'));
   if (found) return { price: found.price, ccy: found.ccy, name: found.name, broker: found.broker, cls: found.cls };
-  // Fallback: synthesized market prices for common Thai-investor tickers
-  // (mock — gives the demo live behaviour for tickers not currently held)
-  const fallback = {
-    // US
-    'TSLA':  { price: 348.20, ccy: 'USD' },
-    'MSFT':  { price: 428.50, ccy: 'USD' },
-    'AMZN':  { price: 195.40, ccy: 'USD' },
-    'META':  { price: 588.10, ccy: 'USD' },
-    'AMD':   { price: 162.80, ccy: 'USD' },
-    'SPY':   { price: 568.20, ccy: 'USD' },
-    'QQQ':   { price: 495.30, ccy: 'USD' },
-    'VOO':   { price: 521.40, ccy: 'USD' },
-    'VTI':   { price: 282.10, ccy: 'USD' },
-    // Thai stocks
-    'AOT':    { price: 64.25,  ccy: 'THB' },
-    'KBANK':  { price: 152.50, ccy: 'THB' },
-    'SCB':    { price: 110.00, ccy: 'THB' },
-    'BBL':    { price: 158.50, ccy: 'THB' },
-    'ADVANC': { price: 287.00, ccy: 'THB' },
-    // Thai mutual funds (NAV) are now fetched live via SEC API
-    // Crypto
-    'SOL':  { price: 168.40, ccy: 'USD', broker: 'bitkub' },
-    'BNB':  { price: 632.20, ccy: 'USD', broker: 'binance_th' },
-    'XRP':  { price: 2.42,   ccy: 'USD', broker: 'bitkub' },
-    'ADA':  { price: 0.864,  ccy: 'USD', broker: 'bitkub' },
-    'DOGE': { price: 0.385,  ccy: 'USD', broker: 'bitazza' },
-  };
-  return fallback[upper] || null;
+  return null;
 }
 
 const TX_TYPES_BASE = [
