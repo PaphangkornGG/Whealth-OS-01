@@ -1384,8 +1384,8 @@ function App() {
           </div>
         </div>
 
-        <window.QuickTxModal open={modalOpen} onClose={() => { setModalOpen(false); setModalPrefill(null); }} onSave={handleSave} prefill={modalPrefill}/>
-        <window.TransactionLedger open={ledgerOpen} onClose={() => setLedgerOpen(false)}/>
+        <window.QuickTxModal open={modalOpen} onClose={() => { setModalOpen(false); setModalPrefill(null); setEditTx(null); }} onSave={handleSave} prefill={modalPrefill} initialData={editTx}/>
+        <window.TransactionLedger open={ledgerOpen} onClose={() => setLedgerOpen(false)} onEditTx={(tx) => { setEditTx(tx); setModalOpen(true); setLedgerOpen(false); }} onDeleteTx={handleDeleteTx}/>
         <Toast show={!!toast}>{toast}</Toast>
       </NavContext.Provider>
     </LangProvider>
