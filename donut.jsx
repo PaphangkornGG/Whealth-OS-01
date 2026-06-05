@@ -1,4 +1,4 @@
-const { ALLOCATION, ALLOCATION_BROKER, TOTAL_THB, fmtTHB, fmtPct } = window.DataLayer;
+const { fmtTHB, fmtPct } = window.DataLayer;
 const { Icon } = window;
 
 // --- Donut chart -------------------------------------------------------
@@ -56,7 +56,7 @@ function Donut({ size=220, thickness=22, segments, hoveredIdx, setHoveredIdx, ce
               {centerLabel || 'Net Worth'}
             </text>
             <text x={center} y={center + 10} textAnchor="middle" fontSize="22" fill="oklch(0.15 0.01 250)" fontFamily="Geist Mono" fontWeight="500">
-              {fmtTHB(TOTAL_THB, { compact: true })}
+              {fmtTHB(window.DataLayer.TOTAL_THB, { compact: true })}
             </text>
             <text x={center} y={center + 28} textAnchor="middle" fontSize="11" fill="oklch(0.45 0.012 250)" fontFamily="Geist Mono">
               THB
@@ -77,8 +77,9 @@ function AllocationCard() {
 
   // Translate class names; broker labels stay as-is (proper nouns)
   const segments = React.useMemo(() => {
+    const D = window.DataLayer;
     if (view === 'class') {
-      return ALLOCATION.map(s => ({ ...s, label: t.classes[s.id] || s.label }));
+      return D.ALLOCATION.map(s => ({ ...s, label: t.classes[s.id] || s.label }));
     }
     // By-account: color each segment by its app's real brand/logo color,
     // tuned to a readable lightness so light brands (Bitkub, InnovestX, MAKE…)
@@ -109,7 +110,7 @@ function AllocationCard() {
       hua_seng_heng:  'oklch(0.44 0.10 255)', // GOLD NOW navy
       mts_gold:       'oklch(0.40 0.11 264)', // MTSGoldX navy
     };
-    return ALLOCATION_BROKER.map(s => ({ ...s, color: BROKER_CHART_COLOR[s.id] || s.color }));
+    return D.ALLOCATION_BROKER.map(s => ({ ...s, color: BROKER_CHART_COLOR[s.id] || s.color }));
   }, [view, t]);
 
   React.useEffect(() => { setHovered(null); }, [view]);
@@ -127,7 +128,7 @@ function AllocationCard() {
             </window.InfoTip>
           </div>
           <p className="text-ink-500 text-[12px] mt-0.5">
-            {view === 'class' ? t.classSub : t.accountSub(ALLOCATION_BROKER.length)}
+            {view === 'class' ? t.classSub : t.accountSub(window.DataLayer.ALLOCATION_BROKER.length)}
           </p>
         </div>
         <div className="flex items-center gap-2">
@@ -156,7 +157,7 @@ function AllocationCard() {
             segments={segments}
             hoveredIdx={hovered}
             setHoveredIdx={setHovered}
-            centerLabel={view === 'class' ? t.netWorthCenter : `${ALLOCATION_BROKER.length} ${t.accountsCenter}`}
+            centerLabel={view === 'class' ? t.netWorthCenter : `${window.DataLayer.ALLOCATION_BROKER.length} ${t.accountsCenter}`}
           />
         </div>
         <div className="flex-1 min-w-0 space-y-3 max-h-[260px] overflow-y-auto scroll-thin pr-1">
@@ -229,13 +230,13 @@ function RebalanceCard() {
   const { t, lang } = window.useT();
   const nav = window.useNav();
   // Build smart alerts from drift
-  const alerts = ALLOCATION
+  const alerts = window.DataLayer.ALLOCATION
     .map(seg => ({ ...seg, driftPct: seg.drift * 100, classLabel: t.classes[seg.id] || seg.label }))
     .sort((a,b) => Math.abs(b.driftPct) - Math.abs(a.driftPct))
     .map((seg, i) => {
       const abs = Math.abs(seg.driftPct);
       const over = seg.driftPct > 0;
-      const amount = Math.abs(seg.drift) * TOTAL_THB;
+      const amount = Math.abs(seg.drift) * window.DataLayer.TOTAL_THB;
       let severity = 'info';
       if (abs > 4) severity = 'warn';
       if (abs > 8) severity = 'loss';
