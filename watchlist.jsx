@@ -202,10 +202,12 @@ function AddToWatchlistModal({ open, lang, existing, onClose, onSave }) {
   });
   const [form, setForm] = React.useState(empty);
   const firstRef = React.useRef(null);
+  const [fetching, setFetching] = React.useState(false);
 
   React.useEffect(() => {
     if (open) {
       setForm(empty());
+      setFetching(false);
       setTimeout(() => firstRef.current?.focus(), 50);
     }
   }, [open]);
@@ -216,6 +218,43 @@ function AddToWatchlistModal({ open, lang, existing, onClose, onSave }) {
     window.addEventListener('keydown', onKey);
     return () => window.removeEventListener('keydown', onKey);
   }, [open, onClose]);
+
+  React.useEffect(() => {
+    if (!form.ticker) return;
+    const t = setTimeout(async () => {
+      setFetching(true);
+      let queryTicker = form.ticker;
+      const CRYPTO_MAP = { BTC: 'BTC-USD', ETH: 'ETH-USD', SOL: 'SOL-USD' };
+      if (form.cls === 'crypto') queryTicker = CRYPTO_MAP[form.ticker] || `${form.ticker}-USD`;
+      else if (form.cls === 'th') queryTicker = `${form.ticker}.BK`;
+      else if (form.ticker === 'GOLDSPOT') queryTicker = 'GC=F';
+
+      if (form.cls === 'fund' && window.SecApi && window.SecApi.isConfigured()) {
+         try {
+            const navData = await window.SecApi.getLatestNAV(form.ticker);
+            if (navData && navData.price) {
+               setForm(f => ({ ...f, price: navData.price, name: navData.nav_date ? `NAV ${navData.nav_date}` : form.ticker }));
+               setFetching(false);
+               return;
+            }
+         } catch(e) {}
+      }
+      
+      try {
+        const res = await fetch(`/api/price?ticker=${encodeURIComponent(queryTicker)}`);
+        if (res.ok) {
+           const data = await res.json();
+           if (data.price) {
+             setForm(f => ({ ...f, price: data.price, name: data.name || form.ticker }));
+           }
+        }
+      } catch (e) {
+      } finally {
+        setFetching(false);
+      }
+    }, 600);
+    return () => clearTimeout(t);
+  }, [form.ticker, form.cls]);
 
   if (!open) return null;
 
@@ -230,7 +269,7 @@ function AddToWatchlistModal({ open, lang, existing, onClose, onSave }) {
   const priceN = parseFloat(form.price) || 0;
   const targetN = parseFloat(form.target) || 0;
   const duplicate = existing.some(x => x.ticker === upper);
-  const valid = upper.length > 0 && priceN > 0;
+  const valid = upper.length > 0;
 
   function commit() {
     if (!valid) return;
@@ -290,39 +329,21 @@ function AddToWatchlistModal({ open, lang, existing, onClose, onSave }) {
             </div>
           </WlField>
 
-          {/* Ticker + name */}
-          <div className="grid grid-cols-3 gap-2.5">
-            <WlField label={lang === 'th' ? 'ตัวย่อ' : 'Ticker'} className="col-span-1">
-              <input
-                ref={firstRef}
-                value={form.ticker}
-                onChange={(e) => update({ ticker: e.target.value.toUpperCase().replace(/[^A-Z0-9.\-&]/g, '') })}
-                placeholder="AAPL"
-                className="w-full bg-surface-soft border border-line rounded-md px-2.5 py-1.5 text-[13px] text-ink-900 num font-medium uppercase focus:outline-none focus:border-brand"
-              />
-            </WlField>
-            <WlField label={lang === 'th' ? 'ชื่อ' : 'Name'} className="col-span-2">
-              <input
-                value={form.name}
-                onChange={(e) => update({ name: e.target.value })}
-                placeholder={lang === 'th' ? 'Apple Inc.' : 'Apple Inc.'}
-                className="w-full bg-surface-soft border border-line rounded-md px-2.5 py-1.5 text-[13px] text-ink-900 focus:outline-none focus:border-brand"
-              />
-            </WlField>
-          </div>
-
-          {/* Price + target */}
+          {/* Ticker + target */}
           <div className="grid grid-cols-2 gap-2.5">
-            <WlField label={lang === 'th' ? `ราคาปัจจุบัน (${form.ccy === 'USD' ? '$' : '฿'})` : `Current price (${form.ccy === 'USD' ? '$' : '฿'})`}>
-              <input
-                value={form.price}
-                onChange={(e) => update({ price: e.target.value.replace(/[^\d.]/g, '') })}
-                placeholder="0.00"
-                inputMode="decimal"
-                className="w-full bg-surface-soft border border-line rounded-md px-2.5 py-1.5 text-[13px] text-ink-900 num focus:outline-none focus:border-brand"
-              />
+            <WlField label={lang === 'th' ? 'ตัวย่อ' : 'Ticker'} className="col-span-1">
+              <div className="relative">
+                <input
+                  ref={firstRef}
+                  value={form.ticker}
+                  onChange={(e) => update({ ticker: e.target.value.toUpperCase().replace(/[^A-Z0-9.\-&]/g, ''), price: '', name: '' })}
+                  placeholder="AAPL"
+                  className="w-full bg-surface-soft border border-line rounded-md px-2.5 py-1.5 text-[13px] text-ink-900 num font-medium uppercase focus:outline-none focus:border-brand"
+                />
+                {fetching && <div className="absolute right-2 top-1/2 -translate-y-1/2 w-3 h-3 rounded-full border-2 border-brand border-t-transparent animate-spin"/>}
+              </div>
             </WlField>
-            <WlField label={lang === 'th' ? `เป้าราคา (${form.ccy === 'USD' ? '$' : '฿'})` : `Target price (${form.ccy === 'USD' ? '$' : '฿'})`} hint={lang === 'th' ? 'ไม่ใส่ก็ได้' : 'optional'}>
+            <WlField label={lang === 'th' ? `เป้าราคา (${form.ccy === 'USD' ? '$' : '฿'})` : `Target price (${form.ccy === 'USD' ? '$' : '฿'})`} hint={lang === 'th' ? 'ไม่ใส่ก็ได้' : 'optional'} className="col-span-1">
               <input
                 value={form.target}
                 onChange={(e) => update({ target: e.target.value.replace(/[^\d.]/g, '') })}
@@ -334,15 +355,20 @@ function AddToWatchlistModal({ open, lang, existing, onClose, onSave }) {
           </div>
 
           {/* Preview */}
-          {upper && priceN > 0 && (
+          {upper && (
             <div className="bg-surface-soft border border-line rounded-lg p-3 flex items-center gap-3">
               <StockLogo ticker={upper} cls={form.cls} size={32}/>
               <div className="flex-1 min-w-0">
                 <div className="text-[13px] text-ink-900 font-medium num">{upper}</div>
-                <div className="text-[11px] text-ink-500 truncate">{form.name || (lang === 'th' ? '— ไม่มีชื่อ —' : '— No name —')}</div>
+                <div className="text-[11px] text-ink-500 truncate">
+                  {form.name || (fetching ? (lang === 'th' ? 'กำลังค้นหา...' : 'Fetching...') : (lang === 'th' ? '— รอซิงค์ราคา —' : '— Pending sync —'))}
+                </div>
               </div>
               <div className="text-right num">
-                <div className="text-[13px] text-ink-900">{form.ccy === 'USD' ? '$' : '฿'}{fmtNum(priceN, priceN < 10 ? 4 : 2)}</div>
+                <div className="text-[13px] text-ink-900">
+                  {fetching ? <span className="w-3 h-3 inline-block rounded-full border-2 border-ink-400 border-t-transparent animate-spin"/> :
+                    (priceN > 0 ? `${form.ccy === 'USD' ? '$' : '฿'}${fmtNum(priceN, priceN < 10 ? 4 : 2)}` : '—')}
+                </div>
                 {targetN > 0 && (
                   <div className="text-[10px] text-ink-500">
                     {lang === 'th' ? 'เป้า ' : 'target '}{form.ccy === 'USD' ? '$' : '฿'}{fmtNum(targetN, targetN < 10 ? 4 : 2)}
