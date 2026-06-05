@@ -148,35 +148,51 @@ function QuickTxModal({ open, onClose, onSave, initialData = null, prefill = nul
   const tickerRef = React.useRef(null);
 
   React.useEffect(() => {
-    if (initialData) {
-      // If editing, state is already initialized, just set Ccy/Cls if missing
-      if (!initialData.ccy) setCcy('THB');
-      if (!initialData.cls) setCls('us');
-    } else {
-      setTicker(prefill?.ticker || '');
-      setName(prefill?.name || '');
-      setType(prefill?.type || 'buy');
-      setAmount('');
-      setPrice('');
-      setBroker(prefill?.broker || '');
-      setBrokerQuery('');
-      setFee('');
-      setDate(new Date().toISOString().slice(0, 10));
-      setShowBrokerList(false);
-      setShowSuggest(false);
-      setPriceSynced(false);
-      setWhtMode('auto');
-      setWhtCustom('');
-      setOverridden(false);
-      setShowClassSelector(false);
-      
-      // Default guess to USD / US stock
-      setCcy('USD');
-      setCls('us');
+    if (open) {
+      if (initialData) {
+        setType(initialData.type || 'buy');
+        setTicker(initialData.ticker || '');
+        setName(initialData.name || '');
+        setBroker(initialData.broker || '');
+        setAmount(initialData.amount != null ? String(initialData.amount) : '');
+        setPrice(initialData.price != null ? String(initialData.price) : '');
+        setFee(initialData.fee != null ? String(initialData.fee) : '');
+        const d = initialData.date ? (initialData.date instanceof Date ? initialData.date : new Date(initialData.date)) : new Date();
+        setDate(d.toISOString().slice(0, 10));
+        setWhtMode(initialData.whtMode || 'auto');
+        setWhtCustom(initialData.whtMode === 'custom' && initialData.wht ? String(initialData.wht) : '');
+        setCcy(initialData.ccy || 'THB');
+        setCls(initialData.cls || 'us');
+        setPriceSynced(true);
+        setOverridden(false);
+        setShowBrokerList(false);
+        setShowSuggest(false);
+        setShowClassSelector(false);
+        setBrokerQuery('');
+      } else {
+        setTicker(prefill?.ticker || '');
+        setName(prefill?.name || '');
+        setType(prefill?.type || 'buy');
+        setAmount('');
+        setPrice('');
+        setBroker(prefill?.broker || '');
+        setBrokerQuery('');
+        setFee('');
+        setDate(new Date().toISOString().slice(0, 10));
+        setShowBrokerList(false);
+        setShowSuggest(false);
+        setPriceSynced(false);
+        setWhtMode('auto');
+        setWhtCustom('');
+        setOverridden(false);
+        setShowClassSelector(false);
+        setCcy('THB');
+        setCls('us');
+      }
     }
       
       // If we have a prefill ticker, sync its price after mount
-      if (prefill?.ticker) {
+      if (prefill?.ticker && !initialData) {
         const lp = getLivePrice(prefill.ticker);
         if (lp) {
           if (lp.ccy) setCcy(lp.ccy);
@@ -190,7 +206,7 @@ function QuickTxModal({ open, onClose, onSave, initialData = null, prefill = nul
         }
       }
       setTimeout(() => tickerRef.current?.focus(), 30);
-  }, [open, prefill]);
+  }, [open, prefill, initialData]);
 
   // Debounced auto-fetch for stock/crypto price and company name when ticker is entered
   React.useEffect(() => {
