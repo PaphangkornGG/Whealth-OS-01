@@ -12,7 +12,7 @@ function PageHeader({ kicker, title, subtitle, action }) {
         <h1 className="text-ink-800 text-[22px] font-semibold tracking-tight mt-0.5">{title}</h1>
         {subtitle && <p className="text-ink-500 text-[13px] mt-1">{subtitle}</p>}
       </div>
-      {action && <div>{action}</div>}
+      {action && <div className="relative z-40">{action}</div>}
     </div>
   );
 }
@@ -191,22 +191,18 @@ function CashflowPage() {
   const { t, lang } = window.useT();
   const I = window.Icon;
 
-  // Page-level period filter removed as requested by user.
-  // We hardcode it to 12 months (1 year).
-  const period = 12;
+  const [selectedYear, setSelectedYear] = React.useState(2026);
+  const [yearOpen, setYearOpen] = React.useState(false);
+  const YEARS = [2026, 2025, 2024, 2023, 2022];
 
   const months = ['Jan','Feb','Mar','Apr','May','Jun','Jul','Aug','Sep','Oct','Nov','Dec'];
   const monthsTH = ['ม.ค.','ก.พ.','มี.ค.','เม.ย.','พ.ค.','มิ.ย.','ก.ค.','ส.ค.','ก.ย.','ต.ค.','พ.ย.','ธ.ค.'];
 
-  // Compute historical from transactions over the chosen window. Mock data
-  // only covers ~12 months, so longer windows will have empty bars — honest
-  // representation of what we actually know.
-  const now = new Date(2026, 4, 27);
-  const pastN = new Array(period).fill(0);
+  // Compute historical from transactions over the chosen year.
+  const pastN = new Array(12).fill(0);
   D.TRANSACTIONS.filter(tx => tx.type === 'dividend').forEach(tx => {
-    const monthsAgo = (now.getFullYear() - tx.date.getFullYear()) * 12 + (now.getMonth() - tx.date.getMonth());
-    if (monthsAgo >= 0 && monthsAgo < period) {
-      pastN[period - 1 - monthsAgo] += D.toTHB(tx.total, tx.ccy);
+    if (tx.date.getFullYear() === selectedYear) {
+      pastN[tx.date.getMonth()] += D.toTHB(tx.total, tx.ccy);
     }
   });
   const pastNTotal = pastN.reduce((s, v) => s + v, 0);
@@ -258,12 +254,39 @@ function CashflowPage() {
         kicker={t.nav.cashflow}
         title={lang === 'th' ? 'กระแสเงินสดจากปันผล' : 'Dividend cashflow'}
         subtitle={lang === 'th' ? 'ประวัติย้อนหลัง + คาดการณ์ล่วงหน้า' : 'Historical and projected income from your portfolio'}
+        action={
+          <div className="relative">
+            <button
+              type="button"
+              onClick={() => setYearOpen(o => !o)}
+              className={`flex items-center gap-2 bg-ink-50 border rounded-lg px-3 py-1.5 text-[13px] font-medium transition-colors ${yearOpen ? 'border-ink-300 text-ink-800' : 'border-ink-200 text-ink-700 hover:border-ink-300'}`}
+            >
+              <I.Calendar size={13}/>
+              <span>{lang === 'th' ? `ปี ${selectedYear}` : selectedYear}</span>
+              <I.ChevronDown size={12} className={`transition-transform ${yearOpen ? 'rotate-180' : ''}`}/>
+            </button>
+            {yearOpen && (
+              <div className="absolute right-0 top-full mt-1.5 bg-ink-0 border border-ink-200 rounded-lg shadow-pop overflow-hidden min-w-[140px]">
+                {YEARS.map(y => (
+                  <button
+                    key={y}
+                    type="button"
+                    onClick={() => { setSelectedYear(y); setYearOpen(false); }}
+                    className={`block w-full text-left px-3 py-1.5 text-[13px] hover:bg-ink-100 transition-colors ${selectedYear === y ? 'text-warn font-medium bg-warn-soft/40' : 'text-ink-700'}`}
+                  >
+                    {lang === 'th' ? `ปี ${y}` : y}
+                  </button>
+                ))}
+              </div>
+            )}
+          </div>
+        }
       />
 
       {/* Top KPIs */}
       <div className="grid grid-cols-1 md:grid-cols-4 gap-3 fade-up" style={{ animationDelay: '30ms' }}>
-        <Kpi label={lang === 'th' ? 'รับปีนี้' : 'Received YTD'} value={D.fmtTHB(D.TOTAL_DIVS_YTD_THB)} tone="warn"/>
-        <Kpi label={lang === 'th' ? `รับ ${period} เดือนล่าสุด` : `Last ${period} months`} value={D.fmtTHB(pastNTotal)} />
+        <Kpi label={lang === 'th' ? 'รับปีนี้ (YTD)' : 'Received YTD'} value={D.fmtTHB(D.TOTAL_DIVS_YTD_THB)} tone="warn"/>
+        <Kpi label={lang === 'th' ? `รับปี ${selectedYear}` : `Received in ${selectedYear}`} value={D.fmtTHB(pastNTotal)} />
         <Kpi label={lang === 'th' ? 'Yield-on-Cost' : 'Yield-on-Cost'} value={`${yieldOnCost.toFixed(2)}%`} tone="gain"/>
         <Kpi label={lang === 'th' ? 'Yield-on-Value' : 'Yield-on-Value'} value={`${yieldOnValue.toFixed(2)}%`} />
       </div>
@@ -329,16 +352,14 @@ function CashflowPage() {
       <div className="bg-ink-50 border border-ink-200 rounded-2xl p-5 shadow-card fade-up" style={{ animationDelay: '60ms' }}>
         <div className="flex items-start justify-between">
           <div>
-            <h3 className="text-ink-700 text-sm font-semibold">{lang === 'th' ? `รับจริง ${period} เดือนล่าสุด` : (t.pastWindow ? t.pastWindow(period) : `Past ${period} months · received`)}</h3>
+            <h3 className="text-ink-700 text-sm font-semibold">{lang === 'th' ? `รับจริงปี ${selectedYear}` : `Received in ${selectedYear}`}</h3>
             <p className="text-ink-500 text-[12px] mt-0.5">{lang === 'th' ? 'แท่งสีอำพันคือเดือนที่ได้รับปันผลจริง' : (t.pastWindowSub || 'Amber bars = actual distributions received')}</p>
           </div>
         </div>
         <div className="mt-5 flex items-end gap-1.5 h-32">
           {pastN.map((v, i) => {
-            const monthIdx = (now.getMonth() - (period - 1) + i + 120) % 12;
+            const monthIdx = i;
             const h = (v / maxPast) * 100;
-            const stride = period > 36 ? 6 : period > 18 ? 3 : period > 12 ? 2 : 1;
-            const showLabel = i % stride === 0;
             return (
               <div key={i} className="flex-1 flex flex-col items-center gap-1.5 group cursor-default" title={D.fmtTHB(v)}>
                 <div className="text-[9px] text-ink-500 num opacity-0 group-hover:opacity-100 transition-opacity">
@@ -348,7 +369,7 @@ function CashflowPage() {
                   className={`w-full rounded-sm transition-all ${v > 0 ? 'bg-warn group-hover:bg-warn' : 'bg-ink-200'}`}
                   style={{ height: `${Math.max(h, 4)}%` }}
                 ></div>
-                <span className="text-[10px] text-ink-500 uppercase">{showLabel ? (lang === 'th' ? monthsTH[monthIdx] : months[monthIdx]) : ''}</span>
+                <span className="text-[10px] text-ink-500 uppercase">{lang === 'th' ? monthsTH[monthIdx] : months[monthIdx]}</span>
               </div>
             );
           })}
@@ -357,7 +378,7 @@ function CashflowPage() {
 
       {/* Forecast + Top dividend payers */}
       <div className="grid grid-cols-1 lg:grid-cols-[1.4fr_1fr] gap-4 fade-up" style={{ animationDelay: '90ms' }}>
-        <window.CashflowCard horizon={period} />
+        <window.CashflowCard horizon={12} />
         <div className="bg-ink-50 border border-ink-200 rounded-2xl p-5 shadow-card">
           <h3 className="text-ink-700 text-sm font-semibold">{lang === 'th' ? 'ผู้จ่ายปันผลสูงสุด' : 'Top dividend payers'}</h3>
           <p className="text-ink-500 text-[12px] mt-0.5">{lang === 'th' ? 'จัดเรียงตามปันผลที่รับปีนี้' : 'Sorted by YTD distributions'}</p>
