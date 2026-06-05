@@ -24,15 +24,17 @@
   }
 
   D.getRangeDataAsync = async function(range) {
-    const [set50Hist, sp500Hist] = await Promise.all([
+    const [set50Hist, sp500Hist, acwiHist] = await Promise.all([
       fetchHistory('^SET.BK', range),
-      fetchHistory('^GSPC', range)
+      fetchHistory('^GSPC', range),
+      fetchHistory('ACWI', range)
     ]);
 
     // Gather all unique timestamps to align the series
     const timeMap = new Set();
     set50Hist.forEach(d => timeMap.add(d.date));
     sp500Hist.forEach(d => timeMap.add(d.date));
+    acwiHist.forEach(d => timeMap.add(d.date));
     
     let times = Array.from(timeMap).sort((a, b) => a - b);
     if (times.length === 0) {
@@ -42,15 +44,18 @@
 
     const set50Vals = [];
     const sp500Vals = [];
+    const acwiVals = [];
     const costVals = [];
     const portVals = [];
     const dateVals = [];
 
     let lastSet50 = set50Hist.length > 0 ? set50Hist[0].price : 100;
     let lastSp500 = sp500Hist.length > 0 ? sp500Hist[0].price : 100;
+    let lastAcwi = acwiHist.length > 0 ? acwiHist[0].price : 100;
 
     let set50Idx = 0;
     let sp500Idx = 0;
+    let acwiIdx = 0;
 
     // Calculate overall return ratio to scale the cost basis for the portfolio line
     const totalCost = D.TOTAL_COST_THB || 1;
@@ -58,8 +63,6 @@
     const returnRatio = currentTotal / totalCost;
 
     // For cost basis, we must replay transactions chronologically
-    // D.TRANSACTIONS is sorted newest first (b.date - a.date)
-    // We reverse it to process oldest first
     const txs = [...D.TRANSACTIONS].reverse();
 
     for (const t of times) {
@@ -72,6 +75,10 @@
         lastSp500 = sp500Hist[sp500Idx].price;
         sp500Idx++;
       }
+      while (acwiIdx < acwiHist.length && acwiHist[acwiIdx].date <= t) {
+        lastAcwi = acwiHist[acwiIdx].price;
+        acwiIdx++;
+      }
 
       // Calculate cost basis up to this timestamp
       let costAtTime = 0;
@@ -79,8 +86,6 @@
         if (tx.date.getTime() / 1000 <= t) {
           if (tx.type === 'buy') costAtTime += tx.total;
           if (tx.type === 'sell') {
-            // Approximate cost reduction by average cost, but we only have total sale value.
-            // For a simple visualization, subtract the sale value.
             costAtTime -= tx.total;
           }
         } else {
@@ -89,11 +94,11 @@
       }
       
       if (costAtTime < 0) costAtTime = 0;
-      // If mock data is used, just use a placeholder cost to make it look decent if there are no txs
       if (costAtTime === 0 && D.TRANSACTIONS.length === 0) costAtTime = D.TOTAL_COST_THB;
 
       set50Vals.push(lastSet50);
       sp500Vals.push(lastSp500);
+      acwiVals.push(lastAcwi);
       costVals.push(costAtTime);
       portVals.push(costAtTime * returnRatio);
       dateVals.push(new Date(t * 1000));
@@ -102,14 +107,17 @@
     // Scale benchmarks to match TOTAL_THB at the end for visual comparison
     const finalSet50 = set50Vals[set50Vals.length - 1] || 1;
     const finalSp500 = sp500Vals[sp500Vals.length - 1] || 1;
+    const finalAcwi = acwiVals[acwiVals.length - 1] || 1;
     
     return {
       portfolio: portVals,
       costBasis: costVals,
       set50: set50Vals.map(v => v * (currentTotal / finalSet50)),
       sp500: sp500Vals.map(v => v * (currentTotal / finalSp500)),
+      acwi: acwiVals.map(v => v * (currentTotal / finalAcwi)),
       set50Raw: set50Vals,
       sp500Raw: sp500Vals,
+      acwiRaw: acwiVals,
       dates: dateVals,
       days: times.length,
     };
