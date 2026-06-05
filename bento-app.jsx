@@ -917,9 +917,10 @@ function App() {
         
         if (!error && data) {
           const D = window.DataLayer;
-          // Clear enriched portfolio holdings and start fresh
-          D.ENRICHED = [];
-          D.TRANSACTIONS = data.map(t => ({
+          // Clear arrays in-place to preserve references
+          D.ENRICHED.length = 0;
+          D.TRANSACTIONS.length = 0;
+          const mappedTxs = data.map(t => ({
             id: t.id,
             date: new Date(t.date),
             type: t.type,
@@ -934,6 +935,7 @@ function App() {
             ccy: t.ccy,
             total: t.total != null ? parseFloat(t.total) : 0,
           }));
+          D.TRANSACTIONS.push(...mappedTxs);
 
           // Re-apply each transaction to D.ENRICHED to reconstruct the lots in chronological order
           const chrono = [...D.TRANSACTIONS].reverse();
