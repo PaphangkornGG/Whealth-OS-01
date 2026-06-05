@@ -46,10 +46,15 @@ function PerformanceChart({ range, setRange }) {
   // X labels — pick a few date markers based on range
   function dateLabel(i) {
     const now = new Date(2026, 4, 27);
+    if (range === '1D') {
+      const hoursBack = (n - 1 - i);
+      const d = new Date(now);
+      d.setHours(d.getHours() - hoursBack);
+      return d.toLocaleTimeString('en-US', { hour: '2-digit', minute: '2-digit' });
+    }
     const daysBack = (n - 1 - i);
     const d = new Date(now);
     d.setDate(d.getDate() - daysBack);
-    if (range === '1D') return d.toLocaleTimeString('en-US', { hour: '2-digit', minute: '2-digit' });
     if (range === '1W') return d.toLocaleDateString('en-US', { weekday: 'short' });
     if (range === '1M' || range === '3M') return d.toLocaleDateString('en-US', { month: 'short', day: 'numeric' });
     if (range === '1Y') return d.toLocaleDateString('en-US', { month: 'short' });

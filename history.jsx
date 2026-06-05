@@ -27,26 +27,6 @@
   const benchSet50    = dailyWalk(909,  DAYS, 0.0004, 0.014);
   const benchSP500    = dailyWalk(1234, DAYS, 0.0009, 0.012);
 
-  // Scale portfolio so that its end value equals current TOTAL_THB
-  const scale = D.TOTAL_THB / portfolioWalk[DAYS - 1];
-  const portfolioTHB = portfolioWalk.map(v => v * scale);
-
-  // Cost basis line — simulated linear accumulation up to current TOTAL_COST_THB
-  // Real-world it would step up with each Buy; for the demo it's a smooth curve.
-  const costBasis = [];
-  for (let i = 0; i < DAYS; i++) {
-    const t = i / (DAYS - 1);
-    // Curve: smooth-ish growth, ending at TOTAL_COST_THB
-    const eased = Math.pow(t, 0.7);
-    costBasis.push(eased * D.TOTAL_COST_THB);
-  }
-
-  // Benchmarks scaled to current portfolio for visual comparison (purely visual baseline)
-  const benchScaleSet50 = D.TOTAL_THB / benchSet50[DAYS - 1];
-  const benchScaleSP500 = D.TOTAL_THB / benchSP500[DAYS - 1];
-  const set50THB = benchSet50.map(v => v * benchScaleSet50 * 0.78); // looks slightly under portfolio
-  const sp500THB = benchSP500.map(v => v * benchScaleSP500 * 1.08); // looks slightly above
-
   // Helpers — get slice for a timeframe
   // Timeframes: '1D' (last 1 day, 24 points), '1W' (7), '1M' (30), '3M' (90), '1Y' (365), 'ALL' (730)
   const RANGES = {
@@ -61,11 +41,40 @@
   function getRangeData(range) {
     const days = RANGES[range] || 30;
     const startIdx = Math.max(0, DAYS - days);
+    
+    // Scale portfolio so that its end value equals current TOTAL_THB dynamically
+    const scale = D.TOTAL_THB / portfolioWalk[DAYS - 1];
+    const benchScaleSet50 = D.TOTAL_THB / benchSet50[DAYS - 1];
+    const benchScaleSP500 = D.TOTAL_THB / benchSP500[DAYS - 1];
+    
+    if (range === '1D') {
+      // Generate 24 intraday points for 1D to make it a smooth line
+      const intraWalk = dailyWalk(42, 24, 0.0001, 0.005);
+      const intraScale = D.TOTAL_THB / intraWalk[23];
+      const intraSet50 = dailyWalk(101, 24, 0.00005, 0.004);
+      const intraSP500 = dailyWalk(202, 24, 0.00008, 0.004);
+      
+      return {
+        portfolio: intraWalk.map(v => v * intraScale),
+        costBasis: Array(24).fill(D.TOTAL_COST_THB),
+        set50: intraSet50.map(v => v * (D.TOTAL_THB / intraSet50[23]) * 0.78),
+        sp500: intraSP500.map(v => v * (D.TOTAL_THB / intraSP500[23]) * 1.08),
+        days: 24,
+      };
+    }
+    
+    const costVals = [];
+    for (let i = startIdx; i < DAYS; i++) {
+      const t = i / (DAYS - 1);
+      const eased = Math.pow(t, 0.7);
+      costVals.push(eased * D.TOTAL_COST_THB);
+    }
+
     return {
-      portfolio: portfolioTHB.slice(startIdx),
-      costBasis: costBasis.slice(startIdx),
-      set50: set50THB.slice(startIdx),
-      sp500: sp500THB.slice(startIdx),
+      portfolio: portfolioWalk.slice(startIdx).map(v => v * scale),
+      costBasis: costVals,
+      set50: benchSet50.slice(startIdx).map(v => v * benchScaleSet50 * 0.78),
+      sp500: benchSP500.slice(startIdx).map(v => v * benchScaleSP500 * 1.08),
       days,
     };
   }
