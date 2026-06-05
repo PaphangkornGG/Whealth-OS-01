@@ -927,8 +927,9 @@ function App() {
             name: t.name || t.ticker || 'UNKNOWN',
             cls: t.cls,
             broker: t.broker,
+            amount: t.units !== null ? parseFloat(t.units) : (t.total ? parseFloat(t.total) : 0),
             units: t.units ? parseFloat(t.units) : null,
-            price: t.price ? parseFloat(t.price) : null,
+            price: t.price ? parseFloat(t.price) : 0,
             fee: t.fee ? parseFloat(t.fee) : 0,
             ccy: t.ccy,
             total: t.total ? parseFloat(t.total) : 0,
@@ -1009,7 +1010,7 @@ function App() {
           if (!Array.isArray(userTxs) || userTxs.length === 0) return;
           const D = window.DataLayer;
           const existingIds = new Set(D.TRANSACTIONS.map(t => t.id));
-          const fresh = userTxs.filter(t => !existingIds.has(t.id)).map(t => ({ ...t, date: new Date(t.date), ticker: t.ticker || 'UNKNOWN', name: t.name || t.ticker || 'UNKNOWN' }));
+          const fresh = userTxs.filter(t => !existingIds.has(t.id)).map(t => ({ ...t, amount: t.amount !== undefined ? t.amount : (t.units !== null ? t.units : t.total), date: new Date(t.date), ticker: t.ticker || 'UNKNOWN', name: t.name || t.ticker || 'UNKNOWN' }));
           if (fresh.length === 0) return;
           fresh.forEach(tx => {
             D.TRANSACTIONS.unshift(tx);
@@ -1223,6 +1224,7 @@ function App() {
       name: held?.name || tickerUpper,
       cls,
       broker: brokerId,
+      amount: tx.type === 'dividend' ? null : tx.amount,
       units: tx.type === 'dividend' ? null : tx.amount,
       price: tx.type === 'dividend' ? null : tx.price,
       fee: tx.fee || 0,
