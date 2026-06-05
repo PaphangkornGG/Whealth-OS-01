@@ -6,8 +6,35 @@ function PerformanceChart({ range, setRange }) {
   const D = window.DataLayer;
   const [hover, setHover] = React.useState(null);
   const [seriesOn, setSeriesOn] = React.useState({ portfolio: true, cost: true, set50: false, sp500: false });
+  const [data, setData] = React.useState(null);
+  const [loading, setLoading] = React.useState(true);
 
-  const data = D.getRangeData(range);
+  React.useEffect(() => {
+    let active = true;
+    setLoading(true);
+    if (D.getRangeDataAsync) {
+      D.getRangeDataAsync(range).then(res => {
+        if (active) {
+          setData(res);
+          setLoading(false);
+        }
+      });
+    } else {
+      // Fallback for old synchronous version if script not updated
+      setData(D.getRangeData(range));
+      setLoading(false);
+    }
+    return () => { active = false; };
+  }, [range, D.TRANSACTIONS.length]); // refetch if range or transactions change
+
+  if (loading || !data || data.days === 0) {
+    return (
+      <div className="bg-ink-50 border border-ink-200 rounded-2xl shadow-card overflow-hidden flex items-center justify-center h-[340px]">
+        <div className="w-6 h-6 border-2 border-brand border-t-transparent rounded-full animate-spin"></div>
+      </div>
+    );
+  }
+
   const n = data.portfolio.length;
 
   // Compute min / max across visible series for chart bounds
@@ -45,16 +72,8 @@ function PerformanceChart({ range, setRange }) {
 
   // X labels — pick a few date markers based on range
   function dateLabel(i) {
-    const now = new Date(2026, 4, 27);
-    if (range === '1D') {
-      const hoursBack = (n - 1 - i);
-      const d = new Date(now);
-      d.setHours(d.getHours() - hoursBack);
-      return d.toLocaleTimeString('en-US', { hour: '2-digit', minute: '2-digit' });
-    }
-    const daysBack = (n - 1 - i);
-    const d = new Date(now);
-    d.setDate(d.getDate() - daysBack);
+    const d = data.dates && data.dates[i] ? new Date(data.dates[i]) : new Date();
+    if (range === '1D') return d.toLocaleTimeString('en-US', { hour: '2-digit', minute: '2-digit' });
     if (range === '1W') return d.toLocaleDateString('en-US', { weekday: 'short' });
     if (range === '1M' || range === '3M') return d.toLocaleDateString('en-US', { month: 'short', day: 'numeric' });
     if (range === '1Y') return d.toLocaleDateString('en-US', { month: 'short' });

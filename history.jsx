@@ -3,81 +3,115 @@
 (function() {
   const D = window.DataLayer;
 
-  // Seeded RNG for stable daily walks
-  function makeRng(seed) {
-    let s = seed;
-    return () => { s = (s * 1664525 + 1013904223) >>> 0; return (s >>> 8) / 0xffffff; };
+  async function fetchHistory(ticker, range) {
+    let yfRange = '1mo';
+    let interval = '1d';
+    if (range === '1D') { yfRange = '1d'; interval = '15m'; }
+    else if (range === '1W') { yfRange = '5d'; interval = '1h'; }
+    else if (range === '1M') { yfRange = '1mo'; interval = '1d'; }
+    else if (range === '3M') { yfRange = '3mo'; interval = '1d'; }
+    else if (range === '1Y') { yfRange = '1y'; interval = '1d'; }
+    else if (range === 'ALL') { yfRange = '2y'; interval = '1d'; } // fallback to 2y for ALL for now
+
+    try {
+      const res = await fetch(`/api/history?ticker=${encodeURIComponent(ticker)}&range=${yfRange}&interval=${interval}`);
+      if (!res.ok) return [];
+      const json = await res.json();
+      return json.history || [];
+    } catch {
+      return [];
+    }
   }
 
-  function dailyWalk(seed, days, drift, volatility) {
-    const r = makeRng(seed);
-    const out = [];
-    let v = 100;
-    for (let i = 0; i < days; i++) {
-      v *= 1 + (r() - 0.5) * volatility + drift;
-      out.push(v);
+  D.getRangeDataAsync = async function(range) {
+    const [set50Hist, sp500Hist] = await Promise.all([
+      fetchHistory('^SET.BK', range),
+      fetchHistory('^GSPC', range)
+    ]);
+
+    // Gather all unique timestamps to align the series
+    const timeMap = new Set();
+    set50Hist.forEach(d => timeMap.add(d.date));
+    sp500Hist.forEach(d => timeMap.add(d.date));
+    
+    let times = Array.from(timeMap).sort((a, b) => a - b);
+    if (times.length === 0) {
+      // Fallback if APIs fail
+      times = Array.from({length: 30}, (_, i) => Date.now()/1000 - (30-i)*86400);
     }
-    return out;
-  }
 
-  const DAYS = 730; // ~2 years of data
-
-  // Portfolio normalized walk (will be scaled to current TOTAL_THB at end)
-  const portfolioWalk = dailyWalk(2026, DAYS, 0.0012, 0.018);
-  const benchSet50    = dailyWalk(909,  DAYS, 0.0004, 0.014);
-  const benchSP500    = dailyWalk(1234, DAYS, 0.0009, 0.012);
-
-  // Helpers — get slice for a timeframe
-  // Timeframes: '1D' (last 1 day, 24 points), '1W' (7), '1M' (30), '3M' (90), '1Y' (365), 'ALL' (730)
-  const RANGES = {
-    '1D':  1,
-    '1W':  7,
-    '1M':  30,
-    '3M':  90,
-    '1Y':  365,
-    'ALL': DAYS,
-  };
-
-  function getRangeData(range) {
-    const days = RANGES[range] || 30;
-    const startIdx = Math.max(0, DAYS - days);
-    
-    // Scale portfolio so that its end value equals current TOTAL_THB dynamically
-    const scale = D.TOTAL_THB / portfolioWalk[DAYS - 1];
-    const benchScaleSet50 = D.TOTAL_THB / benchSet50[DAYS - 1];
-    const benchScaleSP500 = D.TOTAL_THB / benchSP500[DAYS - 1];
-    
-    if (range === '1D') {
-      // Generate 24 intraday points for 1D to make it a smooth line
-      const intraWalk = dailyWalk(42, 24, 0.0001, 0.005);
-      const intraScale = D.TOTAL_THB / intraWalk[23];
-      const intraSet50 = dailyWalk(101, 24, 0.00005, 0.004);
-      const intraSP500 = dailyWalk(202, 24, 0.00008, 0.004);
-      
-      return {
-        portfolio: intraWalk.map(v => v * intraScale),
-        costBasis: Array(24).fill(D.TOTAL_COST_THB),
-        set50: intraSet50.map(v => v * (D.TOTAL_THB / intraSet50[23]) * 0.78),
-        sp500: intraSP500.map(v => v * (D.TOTAL_THB / intraSP500[23]) * 1.08),
-        days: 24,
-      };
-    }
-    
+    const set50Vals = [];
+    const sp500Vals = [];
     const costVals = [];
-    for (let i = startIdx; i < DAYS; i++) {
-      const t = i / (DAYS - 1);
-      const eased = Math.pow(t, 0.7);
-      costVals.push(eased * D.TOTAL_COST_THB);
+    const portVals = [];
+    const dateVals = [];
+
+    let lastSet50 = set50Hist.length > 0 ? set50Hist[0].price : 100;
+    let lastSp500 = sp500Hist.length > 0 ? sp500Hist[0].price : 100;
+
+    let set50Idx = 0;
+    let sp500Idx = 0;
+
+    // Calculate overall return ratio to scale the cost basis for the portfolio line
+    const totalCost = D.TOTAL_COST_THB || 1;
+    const currentTotal = D.TOTAL_THB || 1;
+    const returnRatio = currentTotal / totalCost;
+
+    // For cost basis, we must replay transactions chronologically
+    // D.TRANSACTIONS is sorted newest first (b.date - a.date)
+    // We reverse it to process oldest first
+    const txs = [...D.TRANSACTIONS].reverse();
+
+    for (const t of times) {
+      // Find latest benchmark values up to this timestamp
+      while (set50Idx < set50Hist.length && set50Hist[set50Idx].date <= t) {
+        lastSet50 = set50Hist[set50Idx].price;
+        set50Idx++;
+      }
+      while (sp500Idx < sp500Hist.length && sp500Hist[sp500Idx].date <= t) {
+        lastSp500 = sp500Hist[sp500Idx].price;
+        sp500Idx++;
+      }
+
+      // Calculate cost basis up to this timestamp
+      let costAtTime = 0;
+      for (const tx of txs) {
+        if (tx.date.getTime() / 1000 <= t) {
+          if (tx.type === 'buy') costAtTime += tx.total;
+          if (tx.type === 'sell') {
+            // Approximate cost reduction by average cost, but we only have total sale value.
+            // For a simple visualization, subtract the sale value.
+            costAtTime -= tx.total;
+          }
+        } else {
+          break; // Since txs are chronological, we can stop early
+        }
+      }
+      
+      if (costAtTime < 0) costAtTime = 0;
+      // If mock data is used, just use a placeholder cost to make it look decent if there are no txs
+      if (costAtTime === 0 && D.TRANSACTIONS.length === 0) costAtTime = D.TOTAL_COST_THB;
+
+      set50Vals.push(lastSet50);
+      sp500Vals.push(lastSp500);
+      costVals.push(costAtTime);
+      portVals.push(costAtTime * returnRatio);
+      dateVals.push(new Date(t * 1000));
     }
 
+    // Scale benchmarks to match TOTAL_THB at the end for visual comparison
+    const finalSet50 = set50Vals[set50Vals.length - 1] || 1;
+    const finalSp500 = sp500Vals[sp500Vals.length - 1] || 1;
+    
     return {
-      portfolio: portfolioWalk.slice(startIdx).map(v => v * scale),
+      portfolio: portVals,
       costBasis: costVals,
-      set50: benchSet50.slice(startIdx).map(v => v * benchScaleSet50 * 0.78),
-      sp500: benchSP500.slice(startIdx).map(v => v * benchScaleSP500 * 1.08),
-      days,
+      set50: set50Vals.map(v => v * (currentTotal / finalSet50)),
+      sp500: sp500Vals.map(v => v * (currentTotal / finalSp500)),
+      dates: dateVals,
+      days: times.length,
     };
-  }
+  };
 
   // Generate transaction ledger from holdings — simulate Buys + Dividends
   function genTransactions() {
