@@ -927,12 +927,12 @@ function App() {
             name: t.name || t.ticker || 'UNKNOWN',
             cls: t.cls,
             broker: t.broker,
-            amount: t.units !== null ? parseFloat(t.units) : (t.total ? parseFloat(t.total) : 0),
-            units: t.units ? parseFloat(t.units) : null,
-            price: t.price ? parseFloat(t.price) : 0,
-            fee: t.fee ? parseFloat(t.fee) : 0,
+            amount: (t.units != null && !isNaN(parseFloat(t.units))) ? parseFloat(t.units) : (t.total != null && !isNaN(parseFloat(t.total)) ? parseFloat(t.total) : 0),
+            units: t.units != null ? parseFloat(t.units) : null,
+            price: t.price != null ? parseFloat(t.price) : 0,
+            fee: t.fee != null ? parseFloat(t.fee) : 0,
             ccy: t.ccy,
-            total: t.total ? parseFloat(t.total) : 0,
+            total: t.total != null ? parseFloat(t.total) : 0,
           }));
 
           // Re-apply each transaction to D.ENRICHED to reconstruct the lots in chronological order
@@ -1010,7 +1010,7 @@ function App() {
           if (!Array.isArray(userTxs) || userTxs.length === 0) return;
           const D = window.DataLayer;
           const existingIds = new Set(D.TRANSACTIONS.map(t => t.id));
-          const fresh = userTxs.filter(t => !existingIds.has(t.id)).map(t => ({ ...t, amount: t.amount !== undefined ? t.amount : (t.units !== null ? t.units : t.total), date: new Date(t.date), ticker: t.ticker || 'UNKNOWN', name: t.name || t.ticker || 'UNKNOWN' }));
+          const fresh = userTxs.filter(t => !existingIds.has(t.id)).map(t => ({ ...t, amount: t.amount != null ? t.amount : (t.units != null ? t.units : (t.total != null ? t.total : 0)), date: new Date(t.date), ticker: t.ticker || 'UNKNOWN', name: t.name || t.ticker || 'UNKNOWN' }));
           if (fresh.length === 0) return;
           fresh.forEach(tx => {
             D.TRANSACTIONS.unshift(tx);
