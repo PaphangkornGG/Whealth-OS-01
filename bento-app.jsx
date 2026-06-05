@@ -892,6 +892,10 @@ function App() {
           }
           // We don't overwrite netto:profile here because pages.jsx handles its own hydration, 
           // but we can put classTargets and assetTargets into a known spot if needed.
+          if (meta.watchlist) {
+            localStorage.setItem('netto:watchlist', JSON.stringify(meta.watchlist));
+            window.dispatchEvent(new Event('netto:watchlist-changed'));
+          }
           if (meta.classTargets) {
             localStorage.setItem('netto:classTargets', JSON.stringify(meta.classTargets));
             window.DataLayer.TARGET = meta.classTargets;

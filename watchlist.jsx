@@ -39,6 +39,14 @@ function saveWatchlist(arr) {
     // Don't persist huge spark arrays — they're regenerated from ticker on load
     const lean = arr.map(({ spark, ...rest }) => rest);
     localStorage.setItem(WATCH_KEY, JSON.stringify(lean));
+    
+    const supabase = window.supabaseClient;
+    const user = window.AppUser;
+    if (supabase && user) {
+      supabase.auth.updateUser({
+        data: { watchlist: lean }
+      });
+    }
   } catch {}
 }
 
@@ -49,8 +57,21 @@ function WatchlistCard() {
   const nav = window.useNav();
   const [items, setItems] = React.useState(loadWatchlist);
   const [addOpen, setAddOpen] = React.useState(false);
+  const isInitialMount = React.useRef(true);
 
-  React.useEffect(() => { saveWatchlist(items); }, [items]);
+  React.useEffect(() => {
+    if (isInitialMount.current) {
+      isInitialMount.current = false;
+    } else {
+      saveWatchlist(items);
+    }
+  }, [items]);
+
+  React.useEffect(() => {
+    const handleSync = () => setItems(loadWatchlist());
+    window.addEventListener('netto:watchlist-changed', handleSync);
+    return () => window.removeEventListener('netto:watchlist-changed', handleSync);
+  }, []);
 
   function remove(ticker) {
     setItems(arr => arr.filter(x => x.ticker !== ticker));
