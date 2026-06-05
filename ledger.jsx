@@ -141,7 +141,7 @@ function LedgerRow({ tx, onEdit, onDelete }) {
   const ccySym = tx.ccy === 'USD' ? '$' : '฿';
 
   return (
-    <div className="px-5 py-3 border-b border-ink-200 hover:bg-ink-100/60 transition-colors flex items-center gap-3">
+    <div className="group px-5 py-3 border-b border-ink-200 hover:bg-ink-100/60 transition-colors flex items-center gap-3">
       <div className={`w-8 h-8 rounded-lg flex items-center justify-center text-${typeMeta.tone} bg-${typeMeta.tone}-soft border border-${typeMeta.tone}/20 shrink-0`}>
         {typeMeta.icon}
       </div>
@@ -172,8 +172,8 @@ function LedgerRow({ tx, onEdit, onDelete }) {
           )}
         </div>
       </div>
-      <div className="text-right shrink-0 flex items-center justify-end gap-3 group relative">
-        <div className="text-right transition-opacity group-hover:opacity-10 md:group-hover:opacity-100">
+      <div className="text-right shrink-0 flex items-center justify-end gap-3 relative min-w-[80px]">
+        <div className="text-right transition-opacity group-hover:opacity-0">
           <div className={`num text-[13px] font-medium ${typeMeta.tone === 'gain' ? 'text-ink-700' : typeMeta.tone === 'loss' ? 'text-gain' : 'text-warn'}`}>
             {typeMeta.sign} {fmtTHB(totalTHB, { compact: true })}
           </div>
