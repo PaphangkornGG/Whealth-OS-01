@@ -233,7 +233,7 @@ function QuickTxModal({ open, onClose, onSave, initialData = null, prefill = nul
     if (!overridden) {
       const isCrypto = ['BTC','ETH','SOL','BNB','XRP','ADA','DOGE'].includes(upper);
       const isThai = COMMON_THAI_TICKERS.includes(upper);
-      const isFund = upper.includes('-') || upper.includes('&') || upper.startsWith('SCB') || upper.startsWith('K-') || upper.startsWith('KF') || upper.startsWith('KT') || upper.startsWith('TMB') || upper.startsWith('ONE') || upper.startsWith('ASP');
+      const isFund = upper.includes('-') || upper.includes('&') || (upper.startsWith('SCB') && upper !== 'SCB') || upper.startsWith('K-') || upper.startsWith('KF') || upper.startsWith('KT') || upper.startsWith('TMB') || upper.startsWith('ONE') || upper.startsWith('ASP');
       
       if (isCrypto) {
         setCcy('USD');
@@ -461,7 +461,7 @@ function QuickTxModal({ open, onClose, onSave, initialData = null, prefill = nul
     if (!livePrice) return;
     setPrice(String(livePrice.price));
     setPriceSynced(true);
-    if (livePrice.name) setName(livePrice.name);
+    if (livePrice.name || livePrice.ticker) setName(livePrice.name || livePrice.ticker || '');
     // If broker is empty and the held position has one, pre-fill that too
     if (!broker && livePrice.broker) setBroker(livePrice.broker);
   }
