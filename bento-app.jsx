@@ -942,11 +942,12 @@ function App() {
           chrono.forEach(tx => {
             let held = D.ENRICHED.find(a => a.ticker === tx.ticker && a.broker === tx.broker);
             if (!held && tx.type === 'buy') {
+              const sibling = D.ENRICHED.find(a => a.ticker === tx.ticker);
               held = {
                 ticker: tx.ticker,
-                name: tx.name || tx.ticker,
-                cls: tx.cls || 'th',
-                ccy: tx.ccy || 'THB',
+                name: tx.name || sibling?.name || tx.ticker,
+                cls: tx.cls || sibling?.cls || 'th',
+                ccy: tx.ccy || sibling?.ccy || 'THB',
                 broker: tx.broker,
                 units: 0,
                 avgCost: tx.price,
@@ -962,8 +963,15 @@ function App() {
                 dividendsYTD: 0,
                 feesLifetime: 0,
                 dayChangePct: 0,
-                spark: Array.from({ length: 30 }, (_, i) => 100 + i * 0.1),
               };
+              if (sibling?.spark) {
+                held.spark = [...sibling.spark];
+              } else {
+                const base = tx.price || 100;
+                const rawSpark = window.DataLayer.sparkSeries(tx.ticker.charCodeAt(0), 30, 0);
+                const ratio = base / rawSpark[29];
+                held.spark = rawSpark.map(v => v * ratio);
+              }
               D.ENRICHED.push(held);
             }
             if (!held) return;
@@ -1039,8 +1047,15 @@ function App() {
                 dividendsYTD: 0,
                 feesLifetime: 0,
                 dayChangePct: 0,
-                spark: sibling?.spark || Array.from({ length: 30 }, (_, i) => 100 + i * 0.1),
               };
+              if (sibling?.spark) {
+                held.spark = [...sibling.spark];
+              } else {
+                const base = tx.price || 100;
+                const rawSpark = window.DataLayer.sparkSeries(tx.ticker.charCodeAt(0), 30, 0);
+                const ratio = base / rawSpark[29];
+                held.spark = rawSpark.map(v => v * ratio);
+              }
               D.ENRICHED.push(held);
             }
             if (!held) return;
@@ -1258,8 +1273,16 @@ function App() {
         dividendsYTD: 0,
         feesLifetime: 0,
         dayChangePct: 0,
-        spark: sibling?.spark || Array.from({ length: 30 }, (_, i) => 100 + i * 0.1),
       };
+      if (sibling?.spark) {
+        held.spark = [...sibling.spark];
+      } else {
+        // Generate a synthetic mock sparkline ending near current avgCost or 100
+        const base = tx.price || 100;
+        const rawSpark = window.DataLayer.sparkSeries(tx.ticker.charCodeAt(0), 30, 0);
+        const ratio = base / rawSpark[29];
+        held.spark = rawSpark.map(v => v * ratio);
+      }
       D_.ENRICHED.push(held);
     }
     if (held) {
