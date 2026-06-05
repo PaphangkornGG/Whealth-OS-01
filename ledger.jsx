@@ -1,7 +1,7 @@
 // Transaction Ledger — slide-in drawer with full transaction history.
 const { TRANSACTIONS, BROKERS, ASSET_CLASSES, fmtTHB, fmtNum, fmtUnits, toTHB } = window.DataLayer;
 
-function TransactionLedger({ open, onClose }) {
+function TransactionLedger({ open, onClose, onEditTx, onDeleteTx }) {
   const { t } = window.useT();
   const [filter, setFilter] = React.useState('all'); // 'all' | 'buy' | 'sell' | 'dividend'
   const [search, setSearch] = React.useState('');
@@ -102,7 +102,7 @@ function TransactionLedger({ open, onClose }) {
                 {new Date(dateKey).toLocaleDateString('en-US', { weekday: 'short', month: 'short', day: 'numeric', year: 'numeric' })}
               </div>
               {txs.map(tx => (
-                <LedgerRow key={tx.id} tx={tx} />
+                <LedgerRow key={tx.id} tx={tx} onEdit={() => onEditTx?.(tx)} onDelete={() => onDeleteTx?.(tx.id)} />
               ))}
             </div>
           ))}
@@ -125,8 +125,9 @@ function SumPill({ label, value, tone='ink' }) {
   );
 }
 
-function LedgerRow({ tx }) {
+function LedgerRow({ tx, onEdit, onDelete }) {
   const { t } = window.useT();
+  const [isDeleting, setIsDeleting] = React.useState(false);
   const cls = ASSET_CLASSES[tx.cls] || { color: 'oklch(0.62 0.015 250)', label: tx.cls || 'Other' };
   const broker = BROKERS[tx.broker];
 
@@ -171,13 +172,35 @@ function LedgerRow({ tx }) {
           )}
         </div>
       </div>
-      <div className="text-right shrink-0">
-        <div className={`num text-[13px] font-medium ${typeMeta.tone === 'gain' ? 'text-ink-700' : typeMeta.tone === 'loss' ? 'text-gain' : 'text-warn'}`}>
-          {typeMeta.sign} {fmtTHB(totalTHB, { compact: true })}
+      <div className="text-right shrink-0 flex items-center justify-end gap-3 group relative">
+        <div className="text-right transition-opacity group-hover:opacity-10 md:group-hover:opacity-100">
+          <div className={`num text-[13px] font-medium ${typeMeta.tone === 'gain' ? 'text-ink-700' : typeMeta.tone === 'loss' ? 'text-gain' : 'text-warn'}`}>
+            {typeMeta.sign} {fmtTHB(totalTHB, { compact: true })}
+          </div>
+          {tx.ccy === 'USD' && (
+            <div className="text-[10px] text-ink-500 num">${fmtNum(tx.total, 2)}</div>
+          )}
         </div>
-        {tx.ccy === 'USD' && (
-          <div className="text-[10px] text-ink-500 num">${fmtNum(tx.total, 2)}</div>
-        )}
+        
+        {/* Hover Actions (Edit/Delete) */}
+        <div className="absolute right-0 top-1/2 -translate-y-1/2 flex items-center gap-1 opacity-100 md:opacity-0 md:group-hover:opacity-100 transition-opacity bg-ink-100/90 md:bg-transparent backdrop-blur-sm md:backdrop-blur-none px-2 py-1 rounded-md shadow-sm md:shadow-none">
+          {isDeleting ? (
+            <div className="flex items-center gap-1.5 text-[11px]">
+              <span className="text-ink-600 font-medium whitespace-nowrap">{window.localStorage.getItem('wealthos_lang') === 'th' ? 'ยืนยันลบ?' : 'Sure?'}</span>
+              <button onClick={() => onDelete()} className="px-2 py-1 rounded text-ink-0 bg-loss hover:bg-red-600 transition-colors font-medium">{t.yes || 'Yes'}</button>
+              <button onClick={() => setIsDeleting(false)} className="px-2 py-1 rounded text-ink-600 bg-ink-200 hover:bg-ink-300 transition-colors">{t.no || 'No'}</button>
+            </div>
+          ) : (
+            <>
+              <button onClick={() => onEdit()} className="p-1.5 rounded-md text-ink-500 hover:text-ink-800 hover:bg-ink-200 transition-colors" title={t.edit || 'Edit'}>
+                <window.Icon.Edit size={14}/>
+              </button>
+              <button onClick={() => setIsDeleting(true)} className="p-1.5 rounded-md text-ink-500 hover:text-loss hover:bg-loss-soft transition-colors" title={t.delete || 'Delete'}>
+                <window.Icon.Trash size={14}/>
+              </button>
+            </>
+          )}
+        </div>
       </div>
     </div>
   );

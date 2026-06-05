@@ -116,35 +116,43 @@ const TICKER_SUGGESTIONS = [
   { t: 'DOGE',  n: 'Dogecoin',              cls: 'Crypto' },
 ];
 
-function QuickTxModal({ open, onClose, onSave, prefill }) {
+function QuickTxModal({ onClose, onSave, heldPositions = [], initialData = null, prefill = null }) {
   const { t } = window.useT();
   const TX_TYPES = TX_TYPES_BASE.map(tx => ({ ...tx, label: t[tx.tkey] }));
-  const [ticker, setTicker] = React.useState('');
-  const [name, setName] = React.useState('');
-  const [ccy, setCcy] = React.useState('USD');
-  const [cls, setCls] = React.useState('us');
-  const [type, setType] = React.useState('buy');
-  const [amount, setAmount] = React.useState('');
-  const [price, setPrice] = React.useState('');
-  const [broker, setBroker] = React.useState('');
+  // State
+  const [type, setType] = React.useState(initialData?.type || 'buy');
+  const [ticker, setTicker] = React.useState(initialData?.ticker || '');
+  const [name, setName] = React.useState(initialData?.name || '');
+  const [broker, setBroker] = React.useState(initialData?.broker || '');
   const [brokerQuery, setBrokerQuery] = React.useState('');
   const [showBrokerList, setShowBrokerList] = React.useState(false);
-  const [fee, setFee] = React.useState('');
-  const [date, setDate] = React.useState(() => new Date().toISOString().slice(0, 10));
+  const [amount, setAmount] = React.useState(initialData?.amount ? String(initialData.amount) : '');
+  const [price, setPrice] = React.useState(initialData?.price ? String(initialData.price) : '');
+  const [fee, setFee] = React.useState(initialData?.fee ? String(initialData.fee) : '');
+  // Extract date part in YYYY-MM-DD
+  const initDate = initialData?.date ? (initialData.date instanceof Date ? initialData.date.toISOString().slice(0,10) : new Date(initialData.date).toISOString().slice(0,10)) : new Date().toISOString().slice(0, 10);
+  const [date, setDate] = React.useState(initDate);
   const [showSuggest, setShowSuggest] = React.useState(false);
-  const [priceSynced, setPriceSynced] = React.useState(false);
+  const [priceSynced, setPriceSynced] = React.useState(!!initialData);
+  
+  // Advanced dividend fields
+  const [whtMode, setWhtMode] = React.useState(initialData?.whtMode || 'auto'); // 'auto', 'none', 'custom'
+  const [whtCustom, setWhtCustom] = React.useState(initialData?.whtMode === 'custom' && initialData.wht ? String(initialData.wht) : '');
+
+  // Derived overrides (e.g. if user forces a custom class)
+  const [cls, setCls] = React.useState(initialData?.cls || '');
+  const [ccy, setCcy] = React.useState(initialData?.ccy || 'THB');
   const [navDate, setNavDate] = React.useState(null);
-  // Dividend WHT (withholding tax). Mode 'auto' uses the class-default rate,
-  // 'none' explicitly zeros it (e.g. BOI-exempt dividends), 'custom' lets the
-  // user type the exact baht/dollar amount that was withheld.
-  const [whtMode, setWhtMode] = React.useState('auto');
-  const [whtCustom, setWhtCustom] = React.useState('');
   const [overridden, setOverridden] = React.useState(false);
   const [showClassSelector, setShowClassSelector] = React.useState(false);
   const tickerRef = React.useRef(null);
 
   React.useEffect(() => {
-    if (open) {
+    if (initialData) {
+      // If editing, state is already initialized, just set Ccy/Cls if missing
+      if (!initialData.ccy) setCcy('THB');
+      if (!initialData.cls) setCls('us');
+    } else {
       setTicker(prefill?.ticker || '');
       setName(prefill?.name || '');
       setType(prefill?.type || 'buy');
@@ -165,6 +173,7 @@ function QuickTxModal({ open, onClose, onSave, prefill }) {
       // Default guess to USD / US stock
       setCcy('USD');
       setCls('us');
+    }
       
       // If we have a prefill ticker, sync its price after mount
       if (prefill?.ticker) {
@@ -470,11 +479,12 @@ function QuickTxModal({ open, onClose, onSave, prefill }) {
   function handleSave() {
     if (!canSave) return;
     const payload = {
+      id: initialData?.id, // include ID if editing
       ticker: ticker.toUpperCase(),
       name: name.trim() || ticker.toUpperCase(),
       type,
       amount: parseFloat(amount),
-      price: parseFloat(price),
+      price: parseFloat(price) || 0,
       broker: selectedBroker?.label || customBrokerLabel || null,
       fee: feeNum,
       date,
@@ -549,6 +559,7 @@ function QuickTxModal({ open, onClose, onSave, prefill }) {
                   ref={tickerRef}
                   type="text"
                   value={ticker}
+                  disabled={!!initialData}
                   onChange={(e) => { 
                     setTicker(e.target.value.toUpperCase()); 
                     setShowSuggest(true); 
@@ -558,7 +569,7 @@ function QuickTxModal({ open, onClose, onSave, prefill }) {
                   onFocus={() => setShowSuggest(true)}
                   onBlur={() => setTimeout(() => setShowSuggest(false), 120)}
                   placeholder={t.tickerPlaceholder}
-                  className="w-full bg-ink-100 border border-ink-200 rounded-lg px-3 py-2.5 text-ink-800 placeholder:text-ink-400 num text-[14px] focus:outline-none focus:border-brand focus:bg-ink-0 transition-colors"
+                  className={`w-full bg-ink-100 border border-ink-200 rounded-lg px-3 py-2.5 text-ink-800 placeholder:text-ink-400 num text-[14px] focus:outline-none focus:border-brand focus:bg-ink-0 transition-colors ${initialData ? 'opacity-50 cursor-not-allowed' : ''}`}
                 />
                 {showSuggest && suggestions.length > 0 && (
                   <div className="absolute z-10 left-0 right-0 mt-1.5 bg-ink-100 border border-ink-300 rounded-lg shadow-pop max-h-56 overflow-y-auto scroll-thin">
@@ -1123,7 +1134,7 @@ function QuickTxModal({ open, onClose, onSave, prefill }) {
                     : 'bg-ink-100 text-ink-400 cursor-not-allowed'
                 }`}
               >
-                {t.saveBtn}
+                {initialData ? t.update || 'Update' : t.saveBtn}
               </button>
             </div>
           </div>

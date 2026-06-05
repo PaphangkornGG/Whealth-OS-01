@@ -693,6 +693,7 @@ function App() {
   });
   const [modalOpen, setModalOpen] = React.useState(false);
   const [modalPrefill, setModalPrefill] = React.useState(null);
+  const [editTx, setEditTx] = React.useState(null);
   const [ledgerOpen, setLedgerOpen] = React.useState(false);
   const [toast, setToast] = React.useState(null);
   const [refreshKey, setRefreshKey] = React.useState(0);
@@ -997,6 +998,7 @@ function App() {
 
           if (D.recomputeDerived) D.recomputeDerived();
           setRefreshKey(k => k + 1);
+          setTimeout(() => syncPrices(), 500); // Add a small delay so UI renders first
         }
       } else {
         // Not logged in: standard local storage hydration
@@ -1072,6 +1074,7 @@ function App() {
           });
           if (D.recomputeDerived) D.recomputeDerived();
           setRefreshKey(k => k + 1);
+          syncPrices();
         } catch {}
       }
     };
@@ -1123,31 +1126,77 @@ function App() {
     syncPrices,
   }), [syncing, lastSync]);
 
+  const handleDeleteTx = async (id) => {
+    if (window.supabaseClient) {
+      await window.supabaseClient.from('transactions').delete().eq('id', id);
+      window.location.reload();
+    } else {
+      const userTxs = JSON.parse(localStorage.getItem('netto:userTxs') || '[]');
+      localStorage.setItem('netto:userTxs', JSON.stringify(userTxs.filter(t => t.id !== id)));
+      window.location.reload();
+    }
+  };
+
   async function handleSave(tx) {
     setModalOpen(false);
     setModalPrefill(null);
+    setEditTx(null);
 
-    // 1) Persist the transaction into the live data layer so the ledger,
-    //    cashflow chart, and recent-list pick it up immediately.
     const D = window.DataLayer;
     const tickerUpper = (tx.ticker || '').toUpperCase();
-    // Resolve broker id from the label the modal sent back.
     let brokerId = null;
     if (tx.broker) {
       const match = Object.values(D.BROKERS).find(b => b.label === tx.broker);
       brokerId = match ? match.id : tx.broker.toLowerCase().replace(/[^a-z0-9]/g, '_');
     }
+
+    if (tx.id) {
+      if (window.supabaseClient) {
+        const { error } = await window.supabaseClient.from('transactions').update({
+          date: tx.date ? new Date(`${tx.date}T12:00:00`).toISOString() : new Date().toISOString(),
+          type: tx.type,
+          ticker: tickerUpper,
+          name: tx.name,
+          cls: tx.cls,
+          broker: brokerId,
+          units: tx.type === 'dividend' ? null : tx.amount,
+          price: tx.type === 'dividend' ? null : tx.price,
+          fee: tx.fee || 0,
+          ccy: tx.ccy,
+          total: tx.type === 'dividend' ? tx.amount : tx.amount * tx.price,
+        }).eq('id', tx.id);
+        if (!error) {
+          window.location.reload();
+        } else {
+          showToast(`Error updating: ${error.message}`);
+        }
+      } else {
+        const userTxs = JSON.parse(localStorage.getItem('netto:userTxs') || '[]');
+        const idx = userTxs.findIndex(t => t.id === tx.id);
+        if (idx > -1) {
+          userTxs[idx] = { ...userTxs[idx], ...tx, ticker: tickerUpper, broker: brokerId, units: tx.type === 'dividend' ? null : tx.amount, price: tx.type === 'dividend' ? null : tx.price, total: tx.type === 'dividend' ? tx.amount : tx.amount * tx.price };
+          localStorage.setItem('netto:userTxs', JSON.stringify(userTxs));
+          window.location.reload();
+        }
+      }
+      return;
+    }
+
+    // 1) Persist the transaction into the live data layer so the ledger,
+    //    cashflow chart, and recent-list pick it up immediately.
+    const D_ = window.DataLayer;
+    // Resolve broker id from the label the modal sent back.
     // Find the EXACT (ticker, broker) lot. For sells/dividends without a
     // broker pick, fall back to the first holding of that ticker.
     let held = brokerId
-      ? D.ENRICHED.find(a => a.ticker === tickerUpper && a.broker === brokerId)
+      ? D_.ENRICHED.find(a => a.ticker === tickerUpper && a.broker === brokerId)
       : null;
     if (!held && tx.type !== 'buy') {
-      held = D.ENRICHED.find(a => a.ticker === tickerUpper);
+      held = D_.ENRICHED.find(a => a.ticker === tickerUpper);
       if (held && !brokerId) brokerId = held.broker;
     }
     // Reference any holding (any broker) of this ticker for metadata fallback.
-    const sibling = D.ENRICHED.find(a => a.ticker === tickerUpper);
+    const sibling = D_.ENRICHED.find(a => a.ticker === tickerUpper);
     // Infer currency + class for NEW positions (when not already held).
     const CRYPTO_TICKERS = ['BTC','ETH','SOL','BNB','XRP','ADA','DOGE'];
     const THAI_TICKERS = ['PTT','AOT','KBANK','SCB','BBL','ADVANC','CPALL','TISCO'];
@@ -1180,7 +1229,7 @@ function App() {
       ccy,
       total: tx.type === 'dividend' ? tx.amount : tx.amount * tx.price,
     };
-    D.TRANSACTIONS.unshift(newTx);
+    D_.TRANSACTIONS.unshift(newTx);
 
     // 2) Mutate the matching ENRICHED position so portfolio totals update.
     //    On a BUY into a new (ticker, broker) lot, create a fresh position.
@@ -1207,7 +1256,7 @@ function App() {
         dayChangePct: 0,
         spark: sibling?.spark || Array.from({ length: 30 }, (_, i) => 100 + i * 0.1),
       };
-      D.ENRICHED.push(held);
+      D_.ENRICHED.push(held);
     }
     if (held) {
       if (tx.type === 'buy') {
@@ -1218,7 +1267,7 @@ function App() {
         held.avgCost = newCost / newUnits;
         held.price = tx.price; // latest mark
         held.value = newUnits * tx.price;
-        held.valueTHB = ccy === 'USD' ? held.value * D.FX.USD_THB : held.value;
+        held.valueTHB = ccy === 'USD' ? held.value * D_.FX.USD_THB : held.value;
         held.unrealized = held.value - held.cost;
         held.unrealizedPct = (held.unrealized / held.cost) * 100;
         held.feesLifetime = (held.feesLifetime || 0) + (tx.fee || 0);
@@ -1230,7 +1279,7 @@ function App() {
         held.units = newUnits;
         held.cost = newCost;
         held.value = newUnits * tx.price;
-        held.valueTHB = ccy === 'USD' ? held.value * D.FX.USD_THB : held.value;
+        held.valueTHB = ccy === 'USD' ? held.value * D_.FX.USD_THB : held.value;
         held.unrealized = held.value - held.cost;
         held.unrealizedPct = held.cost > 0 ? (held.unrealized / held.cost) * 100 : 0;
         held.price = tx.price;
@@ -1241,7 +1290,7 @@ function App() {
     }
 
     // 3) Recompute portfolio aggregates.
-    if (D.recomputeDerived) D.recomputeDerived();
+    if (D_.recomputeDerived) D_.recomputeDerived();
 
     // 4) Persist user-entered txs across reloads.
     const persistAndSync = async () => {
@@ -1283,11 +1332,9 @@ function App() {
     setRefreshKey(k => k + 1);
 
     // 6) Friendly toast — show ticker + impact
-    const verb = tx.type === 'buy' ? (window.useT ? '' : '') : '';
-    const lang = (document.documentElement.lang || 'en').toLowerCase();
+    const isTh = (window.localStorage.getItem('wealthos_lang') || 'en') === 'th';
     const verbTh = { buy: 'ซื้อ', sell: 'ขาย', dividend: 'รับปันผล' }[tx.type] || tx.type;
     const verbEn = { buy: 'Bought', sell: 'Sold', dividend: 'Dividend' }[tx.type] || tx.type;
-    const isTh = (window.localStorage.getItem('wealthos_lang') || 'en') === 'th';
     const amountStr = tx.type === 'dividend'
       ? `฿${Math.round(tx.amount).toLocaleString('en-US')}`
       : `${tx.amount.toLocaleString('en-US', { maximumFractionDigits: 4 })} @ ${ccy === 'USD' ? '$' : '฿'}${tx.price.toLocaleString('en-US', { maximumFractionDigits: 2 })}`;
