@@ -116,7 +116,7 @@ const TICKER_SUGGESTIONS = [
   { t: 'DOGE',  n: 'Dogecoin',              cls: 'Crypto' },
 ];
 
-function QuickTxModal({ open, onClose, onSave, heldPositions = [], initialData = null, prefill = null }) {
+function QuickTxModal({ open, onClose, onSave, initialData = null, prefill = null }) {
   const { t } = window.useT();
   const TX_TYPES = TX_TYPES_BASE.map(tx => ({ ...tx, label: t[tx.tkey] }));
   // State
@@ -190,7 +190,6 @@ function QuickTxModal({ open, onClose, onSave, heldPositions = [], initialData =
         }
       }
       setTimeout(() => tickerRef.current?.focus(), 30);
-    }
   }, [open, prefill]);
 
   // Debounced auto-fetch for stock/crypto price and company name when ticker is entered
