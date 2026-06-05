@@ -7,12 +7,29 @@ const { Card, Pill, MoneyBig, ChangeBadge } = window.Bento;
 function GoalsBento() {
   const { t, lang } = window.useT();
   const nav = window.useNav();
-  const [focused, setFocused] = React.useState(D2.GOALS[0]?.id);
-  const main = D2.GOALS.find(g => g.id === focused) || D2.GOALS[0];
-  const others = D2.GOALS.filter(g => g.id !== focused);
+  const { goals } = window.useGoals();
+  const [focused, setFocused] = React.useState(null);
+
+  if (!goals || goals.length === 0) {
+    return (
+      <Card padding="p-5" className="h-[432px] flex flex-col items-center justify-center text-center">
+        <div className="w-12 h-12 rounded-full bg-surface-soft border border-line flex items-center justify-center text-ink-400 mb-3">
+          <I2.Target size={24}/>
+        </div>
+        <h4 className="text-ink-900 font-semibold mb-1">{lang === 'th' ? 'ไม่มีเป้าหมาย' : 'No goals yet'}</h4>
+        <p className="text-[13px] text-ink-500 mb-4">{lang === 'th' ? 'สร้างเป้าหมายการลงทุนของคุณ' : 'Create your first goal to start tracking progress'}</p>
+        <button onClick={() => nav.goTo('goals')} className="px-4 py-2 bg-ink-900 text-white rounded-xl font-medium text-[13px] hover:bg-ink-800 transition-colors">
+          + {lang === 'th' ? 'เป้าหมายใหม่' : 'New goal'}
+        </button>
+      </Card>
+    );
+  }
+
+  const main = goals.find(g => g.id === focused) || goals[0];
+  const others = goals.filter(g => g.id !== main.id);
   const cycleNext = () => {
-    const idx = D2.GOALS.findIndex(g => g.id === focused);
-    const next = D2.GOALS[(idx + 1) % D2.GOALS.length];
+    const idx = goals.findIndex(g => g.id === main.id);
+    const next = goals[(idx + 1) % goals.length];
     setFocused(next.id);
   };
 
