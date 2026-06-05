@@ -23,11 +23,16 @@ function useProfile() {
       let finalProfile = raw ? { ...base, ...JSON.parse(raw) } : base;
       if (user) {
         finalProfile.email = user.email;
-        if (user.user_metadata?.full_name) {
-          finalProfile.name = user.user_metadata.full_name;
-          const parts = finalProfile.name.trim().split(/\s+/).filter(Boolean);
-          if (parts.length >= 2) finalProfile.initials = (parts[0][0] + parts[1][0]).toUpperCase();
-          else if (parts.length === 1) finalProfile.initials = parts[0].slice(0, 2).toUpperCase();
+        if (user.user_metadata) {
+          const meta = user.user_metadata;
+          if (meta.full_name) {
+            finalProfile.name = meta.full_name;
+            const parts = finalProfile.name.trim().split(/\s+/).filter(Boolean);
+            if (parts.length >= 2) finalProfile.initials = (parts[0][0] + parts[1][0]).toUpperCase();
+            else if (parts.length === 1) finalProfile.initials = parts[0].slice(0, 2).toUpperCase();
+          }
+          if (meta.avatarBg) finalProfile.avatarBg = meta.avatarBg;
+          if (meta.avatarImage !== undefined) finalProfile.avatarImage = meta.avatarImage;
         }
       }
       return finalProfile;
