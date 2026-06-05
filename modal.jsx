@@ -513,7 +513,7 @@ function QuickTxModal({ open, onClose, onSave, initialData = null, prefill = nul
 
   return (
     <div className="fixed inset-0 z-50 fade-in" role="dialog" aria-modal="true">
-      <div className="absolute inset-0 bg-ink-0/70 backdrop-blur-sm" onClick={onClose}></div>
+      <div className="absolute inset-0 bg-ink-900/50 transition-opacity" onClick={onClose}></div>
 
       <div className="relative h-full flex items-start justify-center pt-[6vh] px-4 overflow-y-auto scroll-thin">
         <div className="w-full max-w-[460px] bg-ink-50 border border-ink-300 rounded-2xl shadow-pop scale-in overflow-hidden mb-10">

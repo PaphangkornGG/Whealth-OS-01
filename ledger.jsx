@@ -42,7 +42,7 @@ function TransactionLedger({ open, onClose, onEditTx, onDeleteTx }) {
 
   return (
     <div className="fixed inset-0 z-40">
-      <div className="absolute inset-0 bg-ink-0/60 backdrop-blur-sm fade-in" onClick={onClose}></div>
+      <div className="absolute inset-0 bg-ink-900/50 fade-in transition-opacity" onClick={onClose}></div>
       <div className="absolute top-0 right-0 bottom-0 w-full max-w-[640px] bg-ink-50 border-l border-ink-300 shadow-pop flex flex-col" style={{ animation: 'slideIn .25s cubic-bezier(.2,.7,.2,1) both' }}>
         <style>{`@keyframes slideIn { from { transform: translateX(20px); opacity: 0; } to { transform: translateX(0); opacity: 1; } }`}</style>
 
@@ -98,7 +98,7 @@ function TransactionLedger({ open, onClose, onEditTx, onDeleteTx }) {
         <div className="flex-1 overflow-y-auto scroll-thin">
           {grouped.map(([dateKey, txs]) => (
             <div key={dateKey}>
-              <div className="px-5 py-2 bg-ink-0/40 border-b border-ink-200 text-[10px] uppercase tracking-wider text-ink-500 font-medium sticky top-0 backdrop-blur-sm">
+              <div className="px-5 py-2 bg-ink-50/95 border-b border-ink-200 text-[10px] uppercase tracking-wider text-ink-500 font-medium sticky top-0 z-10">
                 {new Date(dateKey).toLocaleDateString('en-US', { weekday: 'short', month: 'short', day: 'numeric', year: 'numeric' })}
               </div>
               {txs.map(tx => (
@@ -183,7 +183,7 @@ function LedgerRow({ tx, onEdit, onDelete }) {
         </div>
         
         {/* Hover Actions (Edit/Delete) */}
-        <div className="absolute right-0 top-1/2 -translate-y-1/2 flex items-center gap-1 opacity-100 md:opacity-0 md:group-hover:opacity-100 transition-opacity bg-ink-100/90 md:bg-transparent backdrop-blur-sm md:backdrop-blur-none px-2 py-1 rounded-md shadow-sm md:shadow-none">
+        <div className="absolute right-0 top-1/2 -translate-y-1/2 flex items-center gap-1 opacity-100 md:opacity-0 md:group-hover:opacity-100 transition-opacity bg-ink-100 md:bg-transparent px-2 py-1 rounded-md shadow-sm md:shadow-none">
           {isDeleting ? (
             <div className="flex items-center gap-1.5 text-[11px]">
               <span className="text-ink-600 font-medium whitespace-nowrap">{window.localStorage.getItem('wealthos_lang') === 'th' ? 'ยืนยันลบ?' : 'Sure?'}</span>
