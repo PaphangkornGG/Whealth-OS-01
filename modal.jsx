@@ -22,7 +22,11 @@ const COMMON_THAI_TICKERS = [
 function getLivePrice(tickerInput) {
   if (!tickerInput) return null;
   const upper = tickerInput.toUpperCase().trim();
-  const found = ENRICHED.find(a => a.ticker === upper || a.ticker.startsWith(upper + '-'));
+  const ENRICHED = window.DataLayer?.ENRICHED || [];
+  const found = ENRICHED.find(a => {
+    if (!a || !a.ticker) return false;
+    return a.ticker === upper || a.ticker.startsWith(upper + '-');
+  });
   if (found) return { price: found.price, ccy: found.ccy, name: found.name, broker: found.broker, cls: found.cls };
   return null;
 }
@@ -413,7 +417,11 @@ function QuickTxModal({ open, onClose, onSave, initialData = null, prefill = nul
   // Merge user's actual portfolio with default suggestions
   const dynamicSuggestions = React.useMemo(() => {
     const userAssets = window.DataLayer?.ENRICHED || [];
-    const userSuggestions = userAssets.map(a => ({ t: a.ticker, n: a.name || a.ticker, cls: a.cls }));
+    const userSuggestions = userAssets.map(a => ({ 
+      t: a.ticker || 'UNKNOWN', 
+      n: a.name || a.ticker || 'Unknown Asset', 
+      cls: a.cls || '' 
+    }));
     
     // Deduplicate against defaults
     const combined = [...userSuggestions];
@@ -426,7 +434,10 @@ function QuickTxModal({ open, onClose, onSave, initialData = null, prefill = nul
   }, []);
 
   const suggestions = ticker
-    ? dynamicSuggestions.filter(s => s.t.toLowerCase().includes(ticker.toLowerCase()) || s.n.toLowerCase().includes(ticker.toLowerCase()))
+    ? dynamicSuggestions.filter(s => 
+        (s.t || '').toLowerCase().includes((ticker || '').toLowerCase()) || 
+        (s.n || '').toLowerCase().includes((ticker || '').toLowerCase())
+      )
     : dynamicSuggestions.slice(0, 8);
 
   function handleClassChange(newCls) {
