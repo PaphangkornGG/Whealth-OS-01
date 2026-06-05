@@ -238,8 +238,6 @@
     },
   ];
 
-  window.DataLayer.getRangeData = getRangeData;
-  window.DataLayer.RANGES = RANGES;
   window.DataLayer.TRANSACTIONS = TRANSACTIONS;
   window.DataLayer.GOALS = GOALS;
 })();
