@@ -231,8 +231,30 @@ function AssetTable({ externalFilter, onClearFilter }) {
                       {a.cls === 'cash' ? '—' : `${a.ccy === 'USD' ? '$' : '฿'}${fmtNum(a.avgCost, a.avgCost < 10 ? 4 : 2)}`}
                     </td>
                     {/* Price */}
-                    <td className="px-4 py-3 text-right num text-ink-700">
-                      {a.cls === 'cash' ? '—' : `${a.ccy === 'USD' ? '$' : '฿'}${fmtNum(a.price, a.price < 10 ? 4 : 2)}`}
+                    <td className="px-4 py-3 text-right">
+                      <div className="font-semibold text-ink-900 group">
+                        <button 
+                          onClick={(e) => {
+                            e.stopPropagation();
+                            const raw = prompt(`Enter manual price for ${a.ticker}:`, a.price);
+                            if (raw !== null) {
+                              const num = parseFloat(raw);
+                              if (!isNaN(num) && num >= 0) {
+                                try {
+                                  const manual = JSON.parse(localStorage.getItem('netto:manualPrices') || '{}');
+                                  manual[a.ticker] = num;
+                                  localStorage.setItem('netto:manualPrices', JSON.stringify(manual));
+                                  window.location.reload();
+                                } catch(e) {}
+                              }
+                            }
+                          }}
+                          className="hover:bg-line px-1 -mx-1 rounded transition-colors cursor-text"
+                          title={lang === 'th' ? 'คลิกเพื่อแก้ไขราคาเอง' : 'Click to override price'}
+                        >
+                          {a.cls === 'cash' ? '—' : `${a.ccy === 'USD' ? '$' : '฿'}${fmtNum(a.price, a.price < 10 ? 4 : 2)}`}
+                        </button>
+                      </div>
                     </td>
                     {/* Spark */}
                     <td className="px-4 py-3">
