@@ -23,6 +23,7 @@ const COLUMNS_BASE = [
 ];
 
 function AssetTable({ externalFilter, onClearFilter }) {
+  const lang = window.localStorage.getItem('wealthos_lang') || 'en';
   const { t } = window.useT();
   const nav = window.useNav();
   const COLUMNS = COLUMNS_BASE.map(c => ({ ...c, label: t.columns[c.tkey] }));
