@@ -1381,39 +1381,41 @@ function App() {
   return (
     <LangProvider>
       <NavContext.Provider value={navValue}>
-        <div className="max-w-[1440px] mx-auto">
-          <TopNav page={page} setPage={setPage}/>
+        <div className="wealthos-app" translate="no">
+          <div className="max-w-[1440px] mx-auto">
+            <TopNav page={page} setPage={setPage}/>
 
-          <div key={`${page}-${refreshKey}`} className="fade-in space-y-4">
-            {page === 'overview' && <OverviewPage/>}
-            {page === 'holdings' && <window.HoldingsPage/>}
-            {page === 'cashflow' && <window.CashflowPage/>}
-            {page === 'goals'    && <window.GoalsPage/>}
-            {page === 'settings' && <window.SettingsPage/>}
+            <div key={`${page}-${refreshKey}`} className="fade-in space-y-4">
+              {page === 'overview' && <OverviewPage/>}
+              {page === 'holdings' && <window.HoldingsPage/>}
+              {page === 'cashflow' && <window.CashflowPage/>}
+              {page === 'goals'    && <window.GoalsPage/>}
+              {page === 'settings' && <window.SettingsPage/>}
+            </div>
+
+            <div className="mt-6 flex items-center justify-between text-[11px] text-ink-500 px-2">
+              <div className="flex items-center gap-3">
+                <span>Wealth OS · v0.6</span>
+                <button 
+                  onClick={syncPrices} 
+                  disabled={syncing}
+                  className={`flex items-center gap-1.5 px-2 py-1 rounded border border-line bg-card hover:bg-surface-soft active:scale-[0.98] transition-all text-ink-700 font-semibold cursor-pointer ${syncing ? 'opacity-50 cursor-not-allowed' : ''}`}
+                >
+                  <span className={`w-1.5 h-1.5 rounded-full ${syncing ? 'bg-warn animate-pulse' : 'bg-gain'}`}></span>
+                  {syncing ? 'Syncing...' : `Synced: ${lastSync}`}
+                </button>
+              </div>
+              <div className="flex items-center gap-3">
+                <span>Prices: Live (Yahoo Finance)</span>
+                <span>FX: ฿{window.DataLayer.FX.USD_THB.toFixed(2)} / USD</span>
+              </div>
+            </div>
           </div>
 
-          <div className="mt-6 flex items-center justify-between text-[11px] text-ink-500 px-2">
-            <div className="flex items-center gap-3">
-              <span>Wealth OS · v0.6</span>
-              <button 
-                onClick={syncPrices} 
-                disabled={syncing}
-                className={`flex items-center gap-1.5 px-2 py-1 rounded border border-line bg-card hover:bg-surface-soft active:scale-[0.98] transition-all text-ink-700 font-semibold cursor-pointer ${syncing ? 'opacity-50 cursor-not-allowed' : ''}`}
-              >
-                <span className={`w-1.5 h-1.5 rounded-full ${syncing ? 'bg-warn animate-pulse' : 'bg-gain'}`}></span>
-                {syncing ? 'Syncing...' : `Synced: ${lastSync}`}
-              </button>
-            </div>
-            <div className="flex items-center gap-3">
-              <span>Prices: Live (Yahoo Finance)</span>
-              <span>FX: ฿{window.DataLayer.FX.USD_THB.toFixed(2)} / USD</span>
-            </div>
-          </div>
+          <window.QuickTxModal open={modalOpen} onClose={() => { setModalOpen(false); setModalPrefill(null); setEditTx(null); }} onSave={handleSave} prefill={modalPrefill} initialData={editTx}/>
+          <window.TransactionLedger open={ledgerOpen} onClose={() => setLedgerOpen(false)} onEditTx={(tx) => { setEditTx(tx); setModalOpen(true); setLedgerOpen(false); }} onDeleteTx={handleDeleteTx}/>
+          <Toast show={!!toast}>{toast}</Toast>
         </div>
-
-        <window.QuickTxModal open={modalOpen} onClose={() => { setModalOpen(false); setModalPrefill(null); setEditTx(null); }} onSave={handleSave} prefill={modalPrefill} initialData={editTx}/>
-        <window.TransactionLedger open={ledgerOpen} onClose={() => setLedgerOpen(false)} onEditTx={(tx) => { setEditTx(tx); setModalOpen(true); setLedgerOpen(false); }} onDeleteTx={handleDeleteTx}/>
-        <Toast show={!!toast}>{toast}</Toast>
       </NavContext.Provider>
     </LangProvider>
   );
