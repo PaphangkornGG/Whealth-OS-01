@@ -1499,4 +1499,226 @@ function App() {
   );
 }
 
-ReactDOM.createRoot(document.getElementById('root')).render(<App />);
+class ErrorBoundary extends React.Component {
+  constructor(props) {
+    super(props);
+    this.state = { hasError: false, error: null, info: null };
+  }
+  static getDerivedStateFromError(error) {
+    return { hasError: true, error };
+  }
+  componentDidCatch(error, info) {
+    console.error('ErrorBoundary caught error:', error, info);
+    this.setState({ info });
+  }
+  render() {
+    if (this.state.hasError) {
+      return (
+        <div className="p-8 text-red-500 bg-red-50 min-h-screen">
+          <h1 className="text-xl font-bold mb-4">React Render Error</h1>
+          <pre className="whitespace-pre-wrap font-mono text-xs">{this.state.error?.stack || this.state.error?.toString()}</pre>
+          <pre className="whitespace-pre-wrap font-mono text-xs mt-4 opacity-70">{this.state.info?.componentStack}</pre>
+        </div>
+      );
+        valueTHB: 0,
+        unrealized: 0,
+        unrealizedPct: 0,
+        totalReturn: 0,
+        totalReturnPct: 0,
+        dividendsLifetime: 0,
+        dividendsYTD: 0,
+        feesLifetime: 0,
+        dayChangePct: 0,
+      };
+      if (sibling?.spark) {
+        held.spark = [...sibling.spark];
+      } else {
+        // Generate a synthetic mock sparkline ending near current avgCost or 100
+        const base = tx.price || 100;
+        const rawSpark = window.DataLayer.sparkSeries((tx.ticker || 'A').charCodeAt(0), 30, 0);
+        const ratio = base / rawSpark[29];
+        held.spark = rawSpark.map(v => v * ratio);
+      }
+      D_.ENRICHED.push(held);
+    }
+    if (held) {
+      if (tx.type === 'buy') {
+        const newUnits = held.units + tx.amount;
+        const newCost = held.cost + tx.amount * tx.price;
+        held.units = newUnits;
+        held.cost = newCost;
+        held.avgCost = newCost / newUnits;
+        held.price = tx.price; // latest mark
+        held.value = newUnits * tx.price;
+        held.valueTHB = ccy === 'USD' ? held.value * D_.FX.USD_THB : held.value;
+        held.unrealized = held.value - held.cost;
+        held.unrealizedPct = (held.unrealized / held.cost) * 100;
+        held.feesLifetime = (held.feesLifetime || 0) + (tx.fee || 0);
+      } else if (tx.type === 'sell') {
+        const newUnits = Math.max(0, held.units - tx.amount);
+        // Reduce cost proportionally
+        const sellRatio = newUnits / held.units;
+        const newCost = held.cost * sellRatio;
+        held.units = newUnits;
+        held.cost = newCost;
+        held.value = newUnits * tx.price;
+        held.valueTHB = ccy === 'USD' ? held.value * D_.FX.USD_THB : held.value;
+        held.unrealized = held.value - held.cost;
+        held.unrealizedPct = held.cost > 0 ? (held.unrealized / held.cost) * 100 : 0;
+        held.price = tx.price;
+      } else if (tx.type === 'dividend') {
+        held.dividendsYTD = (held.dividendsYTD || 0) + tx.amount;
+        held.dividendsLifetime = (held.dividendsLifetime || 0) + tx.amount;
+      }
+    }
+
+    // 3) Recompute portfolio aggregates.
+    if (D_.recomputeDerived) D_.recomputeDerived();
+
+    // 4) Persist user-entered txs across reloads.
+    const persistAndSync = async () => {
+      const supabase = window.supabaseClient;
+      if (user && supabase) {
+        const { error } = await supabase
+          .from('transactions')
+          .insert({
+            user_id: user.id,
+            date: newTx.date.toISOString(),
+            type: newTx.type,
+            ticker: newTx.ticker,
+            name: newTx.name,
+            cls: newTx.cls,
+            broker: newTx.broker,
+            units: newTx.units,
+            price: newTx.price,
+            fee: newTx.fee,
+            ccy: newTx.ccy,
+            total: newTx.total,
+          });
+        if (error) {
+          showToast(`Cloud Sync Error: ${error.message}`);
+        } else {
+          // Notify components that data has updated
+          window.dispatchEvent(new Event('netto:user-changed'));
+        }
+      } else {
+        try {
+          const userTxs = JSON.parse(localStorage.getItem('netto:userTxs') || '[]');
+          userTxs.unshift({ ...newTx, id: `user-${Date.now()}`, date: newTx.date.toISOString() });
+          localStorage.setItem('netto:userTxs', JSON.stringify(userTxs.slice(0, 200)));
+        } catch {}
+      }
+    };
+    persistAndSync();
+
+    // 5) Force re-render of the whole app so derived cards reflect new totals.
+    setRefreshKey(k => k + 1);
+
+    // 6) Friendly toast — show ticker + impact
+    const isTh = (window.localStorage.getItem('wealthos_lang') || 'en') === 'th';
+    const verbTh = { buy: 'ซื้อ', sell: 'ขาย', dividend: 'รับปันผล' }[tx.type] || tx.type;
+    const verbEn = { buy: 'Bought', sell: 'Sold', dividend: 'Dividend' }[tx.type] || tx.type;
+    const amountStr = tx.type === 'dividend'
+      ? `฿${Math.round(tx.amount).toLocaleString('en-US')}`
+      : `${tx.amount.toLocaleString('en-US', { maximumFractionDigits: 4 })} @ ${ccy === 'USD' ? '$' : '฿'}${tx.price.toLocaleString('en-US', { maximumFractionDigits: 2 })}`;
+    showToast(`${isTh ? verbTh : verbEn} ${tickerUpper} · ${amountStr}`);
+  }
+
+  const langName = (window.localStorage.getItem('wealthos_lang') || 'en').toLowerCase();
+
+  if (!user) {
+    return (
+      <LangProvider>
+        <LoginPortal lang={langName} />
+      </LangProvider>
+    );
+  }
+
+  return (
+    <LangProvider>
+      <NavContext.Provider value={navValue}>
+        <div className="wealthos-app" translate="no">
+          <div className="max-w-[1440px] mx-auto">
+            <TopNav page={page} setPage={setPage}/>
+
+            <div key={page} className="fade-in space-y-4">
+              {page === 'overview' && <OverviewPage/>}
+              {page === 'holdings' && <window.HoldingsPage/>}
+              {page === 'cashflow' && <window.CashflowPage/>}
+              {page === 'goals'    && <window.GoalsPage/>}
+              {page === 'settings' && <window.SettingsPage/>}
+            </div>
+
+            <div className="mt-6 flex items-center justify-between text-[11px] text-ink-500 px-2">
+              <div className="flex items-center gap-3">
+                <span>Wealth OS · v0.6</span>
+                <button 
+                  onClick={syncPrices} 
+                  disabled={syncing}
+                  className={`flex items-center gap-1.5 px-2 py-1 rounded border border-line bg-card hover:bg-surface-soft active:scale-[0.98] transition-all text-ink-700 font-semibold cursor-pointer ${syncing ? 'opacity-50 cursor-not-allowed' : ''}`}
+                >
+                  <span className={`w-1.5 h-1.5 rounded-full ${syncing ? 'bg-warn animate-pulse' : 'bg-gain'}`}></span>
+                  {syncing ? 'Syncing...' : `Synced: ${lastSync}`}
+                </button>
+              </div>
+              <div className="flex items-center gap-3">
+                <span>Prices: Live (Yahoo Finance)</span>
+                <span>FX: ฿{window.DataLayer.FX.USD_THB.toFixed(2)} / USD</span>
+              </div>
+            </div>
+          </div>
+
+          <div className="modals-container">
+            {modalOpen && (
+              <window.QuickTxModal 
+                open={true} 
+                onClose={() => { setModalOpen(false); setModalPrefill(null); setEditTx(null); }} 
+                onSave={handleSave} 
+                prefill={modalPrefill} 
+                initialData={editTx}
+              />
+            )}
+            {ledgerOpen && (
+              <window.TransactionLedger 
+                open={true} 
+                onClose={() => setLedgerOpen(false)} 
+                onEditTx={(tx) => { setEditTx(tx); setModalOpen(true); setLedgerOpen(false); }} 
+                onDeleteTx={handleDeleteTx}
+              />
+            )}
+          </div>
+          <Toast show={!!toast}>{toast}</Toast>
+        </div>
+      </NavContext.Provider>
+    </LangProvider>
+  );
+}
+
+class ErrorBoundary extends React.Component {
+  constructor(props) {
+    super(props);
+    this.state = { hasError: false, error: null, info: null };
+  }
+  static getDerivedStateFromError(error) {
+    return { hasError: true, error };
+  }
+  componentDidCatch(error, info) {
+    console.error('ErrorBoundary caught error:', error, info);
+    this.setState({ info });
+  }
+  render() {
+    if (this.state.hasError) {
+      return (
+        <div className="p-8 text-red-500 bg-red-50 min-h-screen">
+          <h1 className="text-xl font-bold mb-4">React Render Error</h1>
+          <pre className="whitespace-pre-wrap font-mono text-xs">{this.state.error?.stack || this.state.error?.toString()}</pre>
+          <pre className="whitespace-pre-wrap font-mono text-xs mt-4 opacity-70">{this.state.info?.componentStack}</pre>
+        </div>
+      );
+    }
+    return this.props.children;
+  }
+}
+
+const root = ReactDOM.createRoot(document.getElementById('root'));
+root.render(<ErrorBoundary><App /></ErrorBoundary>);
