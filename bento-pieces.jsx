@@ -114,11 +114,7 @@ function BalanceCard() {
   const [hidden, setHidden] = React.useState(false);
 
   const balance = ccy === 'THB' ? D.TOTAL_THB : D.TOTAL_THB / D.FX.USD_THB;
-  // 30-day weighted change
-  const startV = D.PORTFOLIO_SPARK[0];
-  const endV = D.PORTFOLIO_SPARK[D.PORTFOLIO_SPARK.length - 1];
-  const monthPct = startV > 0 ? ((endV - startV) / startV) * 100 : 0;
-  const positive = monthPct >= 0;
+  const dayPct = D.DAILY_CHANGE_PCT || 0;
 
   return (
     <Card className="relative overflow-hidden">
@@ -130,8 +126,8 @@ function BalanceCard() {
           <span className="text-ink-500 text-[14px] font-medium">{lang === 'th' ? 'ยอดรวมของฉัน' : 'My Balance'}</span>
           <window.InfoTip title={lang === 'th' ? 'ยอดรวมของฉัน' : 'My Balance'}>
             {lang === 'th'
-              ? 'มูลค่ารวมของทุกสินทรัพย์จากทุกบัญชี/โบรกเกอร์ แปลงเป็นสกุลที่เลือก ตัวเลข % คือเทียบกับเดือนก่อน กดรูปตาเพื่อซ่อนยอด'
-              : 'Total value of every asset across all your accounts, converted to the selected currency. The % compares to last month. Tap the eye to hide the balance.'}
+              ? 'มูลค่ารวมของทุกสินทรัพย์จากทุกบัญชี/โบรกเกอร์ แปลงเป็นสกุลที่เลือก ตัวเลข % ด้านล่างคือผลตอบแทนของพอร์ตในวันนี้'
+              : 'Total value of every asset across all your accounts, converted to the selected currency. The % below is today\'s portfolio return.'}
           </window.InfoTip>
         </div>
         <div className="flex items-center gap-2">
@@ -150,8 +146,8 @@ function BalanceCard() {
             <MoneyBig value={balance} ccy={ccy} size={44}/>
           )}
           <div className="mt-2 flex items-center gap-2 text-[12px]">
-            <ChangeBadge value={monthPct}/>
-            <span className="text-ink-500">{lang === 'th' ? 'เดือนนี้ดีขึ้น' : 'Balance increase, good progress.'}</span>
+            <ChangeBadge value={dayPct}/>
+            <span className="text-ink-500">{lang === 'th' ? 'วันนี้' : 'Today'}</span>
           </div>
         </div>
         <div className="flex flex-col items-end justify-start h-full shrink-0">
