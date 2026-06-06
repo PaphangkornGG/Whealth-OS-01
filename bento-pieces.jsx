@@ -411,55 +411,116 @@ function PLCard() {
   );
 }
 
-// ─── 3. Dividend YTD card ────────────────────────────────────────────
 function DividendYTDCard() {
   const { lang } = window.useT();
-  const divsYTD = D.TOTAL_DIVS_YTD_THB;
-  // Mock month-over-month change (positive trend)
-  const last = divsYTD * 0.18;
-  const prev = divsYTD * 0.13;
-  const change = last - prev;
-  const changePct = prev > 0 ? ((last - prev) / prev) * 100 : 0;
+  const [filter, setFilter] = React.useState('YTD');
 
-  // Top contributors by YTD dividend
-  const contributors = D.ENRICHED
-    .filter(a => (a.dividendsYTD || 0) > 0)
-    .map(a => ({
-      ticker: a.ticker,
-      cls: D.ASSET_CLASSES[a.cls] || { color: 'oklch(0.62 0.015 250)', label: a.cls || 'Other' },
-      amountTHB: D.toTHB(a.dividendsYTD, a.ccy),
-    }))
+  // Generate dynamic options
+  const options = React.useMemo(() => {
+    const now = new Date();
+    const opts = [];
+    for (let i = 0; i < 6; i++) {
+      const d = new Date(now.getFullYear(), now.getMonth() - i, 1);
+      opts.push(d.toLocaleString('en-US', { month: 'short', year: 'numeric' }).toUpperCase());
+    }
+    opts.push('YTD', 'ALL TIME');
+    return opts;
+  }, []);
+
+  const now = new Date();
+  const currYear = now.getFullYear();
+  const allDivs = D.TRANSACTIONS.filter(t => t.type === 'dividend');
+  
+  let filteredDivs = [];
+  let title = lang === 'th' ? 'เงินปันผลสะสม' : 'Total Dividend';
+  let prevTotal = 0;
+  let showChange = false;
+  let changeLabel = '';
+
+  if (filter === 'YTD') {
+    filteredDivs = allDivs.filter(t => new Date(t.date).getFullYear() === currYear);
+    title = lang === 'th' ? 'เงินปันผลสะสมปีนี้' : 'Total Dividend YTD';
+    const prevYTD = allDivs.filter(t => {
+      const d = new Date(t.date);
+      return d.getFullYear() === currYear - 1 && d <= new Date(currYear - 1, now.getMonth(), now.getDate());
+    }).reduce((sum, t) => sum + D.toTHB(t.total, t.ccy), 0);
+    prevTotal = prevYTD;
+    showChange = true;
+    changeLabel = lang === 'th' ? 'เทียบปีที่แล้ว' : 'vs last year';
+  } else if (filter === 'ALL TIME') {
+    filteredDivs = allDivs;
+    title = lang === 'th' ? 'เงินปันผลทั้งหมด' : 'All Time Dividends';
+    showChange = false;
+  } else {
+    filteredDivs = allDivs.filter(t => {
+      const d = new Date(t.date);
+      const mStr = d.toLocaleString('en-US', { month: 'short', year: 'numeric' }).toUpperCase();
+      return mStr === filter;
+    });
+    title = lang === 'th' ? `ปันผลเดือน ${filter}` : `${filter} Dividends`;
+    const [mStr, yStr] = filter.split(' ');
+    const mIndex = ['JAN','FEB','MAR','APR','MAY','JUN','JUL','AUG','SEP','OCT','NOV','DEC'].indexOf(mStr);
+    let pM = mIndex - 1;
+    let pY = parseInt(yStr, 10);
+    if (pM < 0) { pM = 11; pY -= 1; }
+    const prevDivs = allDivs.filter(t => {
+      const d = new Date(t.date);
+      return d.getFullYear() === pY && d.getMonth() === pM;
+    });
+    prevTotal = prevDivs.reduce((sum, t) => sum + D.toTHB(t.total, t.ccy), 0);
+    showChange = true;
+    changeLabel = lang === 'th' ? 'เทียบเดือนก่อน' : 'vs last month';
+  }
+
+  const totalTHB = filteredDivs.reduce((sum, t) => sum + D.toTHB(t.total, t.ccy), 0);
+  const change = totalTHB - prevTotal;
+  const changePct = prevTotal > 0 ? (change / prevTotal) * 100 : 0;
+  const isPos = change >= 0;
+
+  // Top contributors
+  const byTicker = {};
+  filteredDivs.forEach(t => {
+    byTicker[t.ticker] = (byTicker[t.ticker] || 0) + D.toTHB(t.total, t.ccy);
+  });
+  const contributors = Object.entries(byTicker)
+    .map(([ticker, amountTHB]) => {
+      const asset = D.ENRICHED.find(a => a.ticker === ticker);
+      const cls = asset ? (D.ASSET_CLASSES[asset.cls] || { color: 'oklch(0.62 0.015 250)', label: asset.cls || 'Other' }) : { color: 'oklch(0.62 0.015 250)' };
+      return { ticker, amountTHB, cls };
+    })
     .sort((a, b) => b.amountTHB - a.amountTHB)
     .slice(0, 3);
   const totalTop = contributors.reduce((s, c) => s + c.amountTHB, 0) || 1;
 
   return (
     <Card>
-      <div className="flex items-start justify-between">
+      <div className="flex items-start justify-between gap-4">
         <div className="flex items-center gap-2.5">
-          <div className="w-9 h-9 rounded-full bg-gain flex items-center justify-center text-white">
+          <div className="w-9 h-9 rounded-full bg-gain flex items-center justify-center text-white shrink-0">
             <Icon.Coins size={14}/>
           </div>
-          <span className="text-ink-900 text-[15px] font-semibold">{lang === 'th' ? 'เงินปันผลสะสมปีนี้' : 'Total Dividend YTD'}</span>
-          <window.InfoTip title={lang === 'th' ? 'ปันผลสะสมปีนี้' : 'Dividend YTD'}>
-            {lang === 'th'
-              ? 'เงินปันผลที่ “รับมาแล้วจริง” ตั้งแต่ 1 ม.ค. ปีนี้ รวมทุกสินทรัพย์เป็นบาท ด้านล่างคือหุ้นที่จ่ายมากที่สุด'
-              : 'Dividends you’ve actually received since Jan 1 this year, summed in THB. Below are the holdings that paid the most.'}
-          </window.InfoTip>
+          <span className="text-ink-900 text-[15px] font-semibold truncate" title={title}>{title}</span>
         </div>
-        <MonthSelect/>
+        <MonthSelect options={options} value={filter} onChange={setFilter} />
       </div>
 
       <div className="mt-5">
-        <MoneyBig value={divsYTD} ccy="THB" size={28}/>
+        <MoneyBig value={totalTHB} ccy="THB" size={28}/>
       </div>
-      <div className="mt-2 flex items-center gap-2">
-        <Pill tone="gain" size="sm">
-          <Icon.ArrowUp size={10}/>
-          +{D.fmtTHB(change, { compact: true })} ({changePct.toFixed(1)}%)
-        </Pill>
-        <span className="text-[11px] text-ink-500">{lang === 'th' ? 'เทียบเดือนก่อน' : 'vs last month'}</span>
-      </div>
+      
+      {showChange ? (
+        <div className="mt-2 flex items-center gap-2">
+          <Pill tone={isPos ? "gain" : "loss"} size="sm">
+            {isPos ? <Icon.ArrowUp size={10}/> : <Icon.ArrowDown size={10}/>}
+            {isPos ? '+' : ''}{D.fmtTHB(change, { compact: true })} ({changePct.toFixed(1)}%)
+          </Pill>
+          <span className="text-[11px] text-ink-500">{changeLabel}</span>
+        </div>
+      ) : (
+        <div className="mt-2 flex items-center gap-2 opacity-0 select-none">
+          <Pill tone="gain" size="sm">-</Pill>
+        </div>
+      )}
 
       {/* Top contributors */}
       <div className="mt-5">
@@ -471,7 +532,7 @@ function DividendYTDCard() {
             <div key={c.ticker} className="flex items-center gap-2">
               {window.StockLogo && <window.StockLogo ticker={c.ticker} cls={c.cls.id} size={16} showFallbackBorder={false} />}
               {!window.StockLogo && <div className="w-1.5 h-1.5 rounded-full shrink-0" style={{ background: c.cls.color }}></div>}
-              <span className="text-[11px] text-ink-800 font-medium num w-16 shrink-0">{c.ticker}</span>
+              <span className="text-[11px] text-ink-800 font-medium num w-16 shrink-0 truncate">{c.ticker}</span>
               <div className="flex-1 h-1.5 bg-surface-soft rounded-full overflow-hidden">
                 <div className="h-full rounded-full" style={{ width: `${(c.amountTHB / totalTop) * 100}%`, background: c.cls.color }}></div>
               </div>
@@ -479,7 +540,7 @@ function DividendYTDCard() {
             </div>
           ))}
           {contributors.length === 0 && (
-            <div className="text-[12px] text-ink-500">{lang === 'th' ? 'ยังไม่มีปันผล' : 'No dividends yet'}</div>
+            <div className="text-[12px] text-ink-500">{lang === 'th' ? 'ยังไม่มีปันผลในช่วงเวลานี้' : 'No dividends in this period'}</div>
           )}
         </div>
       </div>
@@ -487,25 +548,30 @@ function DividendYTDCard() {
   );
 }
 
-function MonthSelect() {
+function MonthSelect({ options, value, onChange }) {
   const [open, setOpen] = React.useState(false);
-  const [val, setVal] = React.useState('MAY 2026');
-  const months = ['MAY 2026', 'APR 2026', 'MAR 2026', 'YTD', 'ALL TIME'];
+  const ref = React.useRef(null);
+  
+  React.useEffect(() => {
+    const handleClickOutside = (event) => {
+      if (ref.current && !ref.current.contains(event.target)) setOpen(false);
+    };
+    document.addEventListener("mousedown", handleClickOutside);
+    return () => document.removeEventListener("mousedown", handleClickOutside);
+  }, [ref]);
+
   return (
-    <div className="relative">
+    <div className="relative shrink-0" ref={ref}>
       <button onClick={() => setOpen(o => !o)} className="flex items-center gap-1 bg-white border border-line2 rounded-full px-2.5 py-1 text-[11px] font-semibold text-ink-700 hover:bg-surface-soft transition-colors">
-        {val}
+        {value}
         <Icon.ChevronDown size={10}/>
       </button>
       {open && (
-        <>
-          <div className="fixed inset-0 z-30" onClick={() => setOpen(false)}></div>
-          <div className="absolute right-0 top-full mt-1 z-40 bg-card border border-line2 rounded-xl shadow-pop py-1 min-w-[120px]">
-            {months.map(m => (
-              <button key={m} onClick={() => { setVal(m); setOpen(false); }} className="w-full text-left px-3 py-1.5 text-[12px] hover:bg-surface-soft">{m}</button>
-            ))}
-          </div>
-        </>
+        <div className="absolute right-0 top-full mt-1 z-40 bg-card border border-line2 rounded-xl shadow-pop py-1 min-w-[120px]">
+          {options.map(m => (
+            <button key={m} onClick={() => { onChange(m); setOpen(false); }} className={`w-full text-left px-3 py-1.5 text-[12px] hover:bg-surface-soft ${value === m ? 'font-semibold text-ink-900' : 'text-ink-700'}`}>{m}</button>
+          ))}
+        </div>
       )}
     </div>
   );
