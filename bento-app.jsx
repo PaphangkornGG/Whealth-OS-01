@@ -1145,8 +1145,20 @@ function App() {
   }), [syncing, lastSync]);
 
   const handleDeleteTx = async (id) => {
-    if (window.supabaseClient) {
-      await window.supabaseClient.from('transactions').delete().eq('id', id);
+    if (user && window.supabaseClient) {
+      if (typeof id === 'string' && id.startsWith('tx-')) {
+        showToast(lang === 'th' ? 'กรุณารีเฟรชหน้าจอ 1 ครั้งก่อนลบรายการที่เพิ่งเพิ่มใหม่' : 'Please refresh the page before deleting this newly added transaction.');
+        return;
+      }
+      const { data, error } = await window.supabaseClient.from('transactions').delete().eq('id', id).select();
+      if (error) {
+        showToast(`Error deleting: ${error.message}`);
+        return;
+      }
+      if (!data || data.length === 0) {
+        showToast(lang === 'th' ? 'ลบไม่สำเร็จ (อาจไม่มีสิทธิ์หรือหารายการไม่เจอ)' : 'Delete failed (no permission or not found)');
+        return;
+      }
       window.location.reload();
     } else {
       const userTxs = JSON.parse(localStorage.getItem('netto:userTxs') || '[]');
@@ -1169,8 +1181,12 @@ function App() {
     }
 
     if (tx.id) {
-      if (window.supabaseClient) {
-        const { error } = await window.supabaseClient.from('transactions').update({
+      if (user && window.supabaseClient) {
+        if (typeof tx.id === 'string' && tx.id.startsWith('tx-')) {
+          showToast(lang === 'th' ? 'กรุณารีเฟรชหน้าจอ 1 ครั้งก่อนแก้ไขรายการที่เพิ่งเพิ่มใหม่' : 'Please refresh the page before editing this newly added transaction.');
+          return;
+        }
+        const { data, error } = await window.supabaseClient.from('transactions').update({
           date: tx.date ? new Date(`${tx.date}T12:00:00`).toISOString() : new Date().toISOString(),
           type: tx.type,
           ticker: tickerUpper,
@@ -1182,11 +1198,14 @@ function App() {
           fee: tx.fee || 0,
           ccy: tx.ccy,
           total: tx.type === 'dividend' ? tx.amount : tx.amount * tx.price,
-        }).eq('id', tx.id);
-        if (!error) {
-          window.location.reload();
-        } else {
+        }).eq('id', tx.id).select();
+        
+        if (error) {
           showToast(`Error updating: ${error.message}`);
+        } else if (!data || data.length === 0) {
+          showToast(lang === 'th' ? 'แก้ไขไม่สำเร็จ (อาจไม่มีสิทธิ์หรือหารายการไม่เจอ)' : 'Update failed (no permission or not found)');
+        } else {
+          window.location.reload();
         }
       } else {
         const userTxs = JSON.parse(localStorage.getItem('netto:userTxs') || '[]');
