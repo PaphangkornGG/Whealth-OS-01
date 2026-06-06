@@ -189,7 +189,23 @@ function CcySelect({ value, onChange }) {
       >
         <span className="w-3.5 h-3.5 rounded-full bg-brand/20 flex items-center justify-center text-[8px]">฿</span>
         {value}
-        <Icon.ChevronDownfunction RangeSelect({ value, onChange }) {
+        <Icon.ChevronDown size={10}/>
+      </button>
+      {open && (
+        <>
+          <div className="fixed inset-0 z-30" onClick={() => setOpen(false)}></div>
+          <div className="absolute right-0 top-full mt-1 z-40 bg-card border border-line2 rounded-xl shadow-pop py-1 min-w-[80px]">
+            {opts.map(o => (
+              <button key={o} onClick={() => { onChange(o); setOpen(false); }} className="w-full text-left px-3 py-1.5 text-[12px] hover:bg-surface-soft">{o}</button>
+            ))}
+          </div>
+        </>
+      )}
+    </div>
+  );
+}
+
+function RangeSelect({ value, onChange }) {
   const [open, setOpen] = React.useState(false);
   const opts = ['1M', '3M', '1Y', 'YTD', 'ALL'];
   const displayVal = value === 'ALL' ? 'ALL TIME' : value;
