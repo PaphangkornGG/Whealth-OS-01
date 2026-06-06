@@ -264,8 +264,9 @@ function MoverSlot({ assets, value, exclude, onChange, lang }) {
                   onClick={() => { onChange(o.ticker); setOpen(false); }}
                   className={`w-full flex items-center justify-between gap-3 px-3 py-1.5 hover:bg-surface-soft transition-colors ${o.ticker === value ? 'bg-surface-soft' : ''}`}
                 >
-                  <span className="flex items-center gap-1.5 min-w-0">
-                    <span className="w-1.5 h-1.5 rounded-full shrink-0" style={{ background: D.ASSET_CLASSES[o.cls]?.color }}></span>
+                  <span className="flex items-center gap-2.5 min-w-0">
+                    {window.StockLogo && <window.StockLogo ticker={o.ticker} cls={o.cls} size={18} showFallbackBorder={false} />}
+                    {!window.StockLogo && <span className="w-1.5 h-1.5 rounded-full shrink-0" style={{ background: D.ASSET_CLASSES[o.cls]?.color }}></span>}
                     <span className="num text-[12px] text-ink-800 truncate">{o.ticker.replace('-THB','')}</span>
                   </span>
                   <span className={`num text-[11px] font-semibold shrink-0 ${op ? 'text-gain' : 'text-loss'}`}>
@@ -468,7 +469,8 @@ function DividendYTDCard() {
         <div className="space-y-1.5">
           {contributors.map(c => (
             <div key={c.ticker} className="flex items-center gap-2">
-              <div className="w-1.5 h-1.5 rounded-full shrink-0" style={{ background: c.cls.color }}></div>
+              {window.StockLogo && <window.StockLogo ticker={c.ticker} cls={c.cls.id} size={16} showFallbackBorder={false} />}
+              {!window.StockLogo && <div className="w-1.5 h-1.5 rounded-full shrink-0" style={{ background: c.cls.color }}></div>}
               <span className="text-[11px] text-ink-800 font-medium num w-16 shrink-0">{c.ticker}</span>
               <div className="flex-1 h-1.5 bg-surface-soft rounded-full overflow-hidden">
                 <div className="h-full rounded-full" style={{ width: `${(c.amountTHB / totalTop) * 100}%`, background: c.cls.color }}></div>

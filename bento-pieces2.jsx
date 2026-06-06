@@ -517,9 +517,10 @@ function TodayReceivedCard() {
           </span>
         </div>
         {top && (
-          <div className="mt-2 flex items-center gap-1.5 text-[11px] text-ink-500">
-            <span className="w-1.5 h-1.5 rounded-full shrink-0" style={{ background: D.ASSET_CLASSES[top.cls]?.color }}></span>
-            <span className="num font-medium text-ink-700">{top.ticker}</span>
+          <div className="flex items-center gap-1.5 min-w-0 mt-2">
+            {window.StockLogo && <window.StockLogo ticker={top.ticker} cls={top.cls} size={16} showFallbackBorder={false} />}
+            {!window.StockLogo && <span className="w-1.5 h-1.5 rounded-full shrink-0" style={{ background: D.ASSET_CLASSES[top.cls]?.color }}></span>}
+            <span className="text-[12px] font-medium text-ink-800 truncate">{top.ticker.replace('-THB','')}</span>
             <span>{lang === 'th' ? 'นำกลุ่ม' : 'leads'}</span>
             <span className="num text-ink-700">{D.fmtTHB(top.value, { compact: true })}</span>
           </div>

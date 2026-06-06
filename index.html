@@ -104,6 +104,112 @@
         document.getElementById('root').innerHTML = '<div style="position:fixed; inset:0; z-index:99999; background:black; color:#ff4444; padding:20px; overflow:auto;"><h1>PROMISE CRASHED</h1><pre style="white-space:pre-wrap; word-break:break-word;">' + (e.reason ? e.reason.stack : e.reason) + '</pre></div>';
       }
     });
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8" />
+<meta name="viewport" content="width=device-width, initial-scale=1" />
+<title>Wealth OS</title>
+<link rel="icon" type="image/svg+xml" href="data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 32 32' fill='none'%3E%3Cdefs%3E%3ClinearGradient id='g1' x1='0' y1='0' x2='32' y2='32' gradientUnits='userSpaceOnUse'%3E%3Cstop stop-color='%234C2CB3'/%3E%3Cstop offset='1' stop-color='%232D1C66'/%3E%3C/linearGradient%3E%3ClinearGradient id='g2' x1='8' y1='12' x2='24' y2='22' gradientUnits='userSpaceOnUse'%3E%3Cstop stop-color='%2360D0DD'/%3E%3Cstop offset='1' stop-color='%234392F1'/%3E%3C/linearGradient%3E%3C/defs%3E%3Crect width='32' height='32' rx='8' fill='url(%23g1)'/%3E%3Cpath d='M8 14 L12 22 L16 16 L20 22 L24 10' stroke='url(%23g2)' stroke-width='2.5' stroke-linecap='round' stroke-linejoin='round'/%3E%3Ccircle cx='24' cy='10' r='2.5' fill='%23FFBB00'/%3E%3C/svg%3E" />
+<link rel="preconnect" href="https://fonts.googleapis.com" />
+<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin />
+<link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700;800&family=JetBrains+Mono:wght@400;500;600;700&family=Noto+Sans+Thai:wght@400;500;600;700&display=swap" rel="stylesheet" />
+<script src="https://cdn.tailwindcss.com"></script>
+<script>
+  // Light Bento theme. The "ink-*" scale is intentionally LIGHT-mapped
+  // so legacy dark-theme components from earlier iterations get re-skinned
+  // for free (ink-0 = page bg, ink-50 = card, ink-700/800 = dark text).
+  tailwind.config = {
+    theme: {
+      extend: {
+        fontFamily: {
+          sans: ['Inter', 'Noto Sans Thai', 'ui-sans-serif', 'system-ui'],
+          mono: ['JetBrains Mono', 'ui-monospace', 'monospace'],
+        },
+        colors: {
+          // Bento-native names
+          bg:    'oklch(0.92 0.005 250)',
+          card:  'oklch(0.99 0.002 250)',
+          line:  'oklch(0.90 0.005 250)',
+          line2: 'oklch(0.85 0.006 250)',
+          surface: {
+            inverse: 'oklch(0.18 0.01 250)',
+            soft:    'oklch(0.95 0.005 250)',
+          },
+          lime:   'oklch(0.85 0.18 130)',
+          // Legacy "ink" scale (re-mapped LIGHT)
+          ink: {
+            0:   'oklch(0.92 0.005 250)',  // page bg
+            50:  'oklch(0.99 0.002 250)',  // card bg
+            100: 'oklch(0.95 0.005 250)',  // raised / pill bg
+            200: 'oklch(0.90 0.005 250)',  // hairline
+            300: 'oklch(0.85 0.006 250)',  // stronger border
+            400: 'oklch(0.65 0.012 250)',  // very muted text
+            500: 'oklch(0.52 0.012 250)',  // muted text
+            600: 'oklch(0.40 0.012 250)',
+            700: 'oklch(0.25 0.01 250)',
+            800: 'oklch(0.15 0.01 250)',   // primary text
+            900: 'oklch(0.08 0.01 250)',
+          },
+          // Accents — used by both bento + legacy components
+          brand:  { DEFAULT: 'oklch(0.55 0.22 264)', soft: 'oklch(0.55 0.22 264 / 0.12)' },
+          gain:   { DEFAULT: 'oklch(0.62 0.18 145)', soft: 'oklch(0.62 0.18 145 / 0.14)' },
+          loss:   { DEFAULT: 'oklch(0.62 0.22 28)',  soft: 'oklch(0.62 0.22 28 / 0.12)' },
+          warn:   { DEFAULT: 'oklch(0.72 0.16 75)',  soft: 'oklch(0.72 0.16 75 / 0.14)' },
+          violet: { DEFAULT: 'oklch(0.55 0.20 295)', soft: 'oklch(0.55 0.20 295 / 0.14)' },
+        },
+        boxShadow: {
+          'card': '0 1px 2px 0 oklch(0 0 0 / 0.04), 0 0 0 1px oklch(0 0 0 / 0.04)',
+          'pop':  '0 12px 32px -8px oklch(0 0 0 / 0.18), 0 4px 8px -2px oklch(0 0 0 / 0.08)',
+        },
+      },
+    },
+  };
+</script>
+<style>
+  html, body { background: oklch(0.92 0.005 250); }
+  body {
+    font-family: 'Inter', 'Noto Sans Thai', ui-sans-serif, system-ui;
+    color: oklch(0.15 0.01 250);
+    -webkit-font-smoothing: antialiased;
+    font-feature-settings: 'cv11', 'ss01';
+  }
+  .num, .font-mono { font-variant-numeric: tabular-nums; font-feature-settings: 'tnum'; }
+  ::selection { background: oklch(0.55 0.22 264 / 0.18); }
+
+  @keyframes fadeUp { from { opacity: 0; transform: translateY(8px); } to { opacity: 1; transform: translateY(0); } }
+  .fade-up { animation: fadeUp .4s cubic-bezier(.2,.7,.2,1) both; }
+  @keyframes scaleIn { from { opacity: 0; transform: scale(.96); } to { opacity: 1; transform: scale(1); } }
+  .scale-in { animation: scaleIn .18s cubic-bezier(.2,.7,.2,1) both; }
+  @keyframes fadeIn { from { opacity: 0; } to { opacity: 1; } }
+  .fade-in { animation: fadeIn .2s ease both; }
+
+  input[type=range] { -webkit-appearance: none; height: 4px; background: oklch(0.88 0.005 250); border-radius: 999px; }
+  input[type=range]::-webkit-slider-thumb { -webkit-appearance: none; width: 16px; height: 16px; background: oklch(0.55 0.22 264); border-radius: 50%; cursor: pointer; box-shadow: 0 2px 4px rgba(0,0,0,.2); }
+  .scroll-thin::-webkit-scrollbar { width: 6px; height: 6px; }
+  .scroll-thin::-webkit-scrollbar-thumb { background: oklch(0.78 0.008 250); border-radius: 3px; }
+
+  /* Sparkline */
+  .spark { fill: none; stroke-width: 1.5; stroke-linecap: round; stroke-linejoin: round; }
+</style>
+
+<script src="https://unpkg.com/react@18.3.1/umd/react.development.js" integrity="sha384-hD6/rw4ppMLGNu3tX5cjIb+uRZ7UkRJ6BPkLpg4hAu/6onKUg4lLsHAs9EBPT82L" crossorigin="anonymous"></script>
+<script src="https://unpkg.com/react-dom@18.3.1/umd/react-dom.development.js" integrity="sha384-u6aeetuaXnQ38mYT8rp6sbXaQe3NL9t+IBXmnYxwkUI2Hw4bsp2Wvmx4yRQF1uAm" crossorigin="anonymous"></script>
+<script src="https://unpkg.com/@babel/standalone@7.29.0/babel.min.js" integrity="sha384-m08KidiNqLdpJqLq95G/LEi8Qvjl/xUYll3QILypMoQ65QorJ9Lvtp2RXYGBFj1y" crossorigin="anonymous"></script>
+</head>
+<body class="min-h-screen p-4 md:p-6">
+  <div id="root"></div>
+  <script>
+    window.addEventListener('error', function(e) {
+      if (document.getElementById('root')) {
+        document.getElementById('root').innerHTML = '<div style="position:fixed; inset:0; z-index:99999; background:black; color:#ff4444; padding:20px; overflow:auto;"><h1>APP CRASHED</h1><pre style="white-space:pre-wrap; word-break:break-word;">' + (e.error ? e.error.stack : e.message) + '</pre></div>';
+      }
+    });
+    window.addEventListener('unhandledrejection', function(e) {
+      if (document.getElementById('root')) {
+        document.getElementById('root').innerHTML = '<div style="position:fixed; inset:0; z-index:99999; background:black; color:#ff4444; padding:20px; overflow:auto;"><h1>PROMISE CRASHED</h1><pre style="white-space:pre-wrap; word-break:break-word;">' + (e.reason ? e.reason.stack : e.reason) + '</pre></div>';
+      }
+    });
   </script>
   <script src="https://unpkg.com/@supabase/supabase-js@2"></script>
   <script type="text/babel" src="supabase.jsx?v=4"></script>
@@ -124,8 +230,8 @@
   <script type="text/babel" src="watchlist.jsx?v=6"></script>
   <script type="text/babel" src="table.jsx?v=5"></script>
   <script type="text/babel" src="pages.jsx?v=4"></script>
-  <script type="text/babel" src="bento-pieces.jsx?v=11"></script>
-  <script type="text/babel" src="bento-pieces2.jsx?v=4"></script>
+  <script type="text/babel" src="bento-pieces.jsx?v=12"></script>
+  <script type="text/babel" src="bento-pieces2.jsx?v=5"></script>
   <script type="text/babel" src="bento-app.jsx?v=17"></script>
 </body>
 </html>
