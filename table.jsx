@@ -335,8 +335,10 @@ function AssetTable({ externalFilter, onClearFilter }) {
         <span>{t.showingX(rows.length, ENRICHED.length)}</span>
         <div className="flex items-center gap-6 num">
           <span>{t.totalCost} <span className="text-ink-700">{fmtTHB(window.DataLayer.TOTAL_COST_THB)}</span></span>
-          <span>{t.totalValue} <span className="text-ink-700">{fmtTHB(window.DataLayer.TOTAL_THB)}</span></span>
-          <span>{t.PL} <span className="text-gain">{fmtTHB(window.DataLayer.TOTAL_THB - window.DataLayer.TOTAL_COST_THB, { sign: true })}</span></span>
+          <div className="flex items-center gap-4 text-xs font-medium text-ink-700 bg-ink-100/50 px-3 py-2 rounded">
+            <span>{t.totalVal}: {fmtTHB(window.DataLayer.TOTAL_THB)}</span>
+            <span>{t.PL} <span className={window.DataLayer.TOTAL_THB - window.DataLayer.TOTAL_COST_THB >= 0 ? 'text-gain' : 'text-loss'}>{fmtTHB(window.DataLayer.TOTAL_THB - window.DataLayer.TOTAL_COST_THB, { sign: true })}</span></span>
+          </div>
         </div>
       </div>
     </div>
