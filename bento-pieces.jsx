@@ -154,13 +154,15 @@ function BalanceCard() {
             <span className="text-ink-500">{lang === 'th' ? 'เดือนนี้ดีขึ้น' : 'Balance increase, good progress.'}</span>
           </div>
         </div>
-        <button
-          onClick={() => setHidden(h => !h)}
-          className="shrink-0 w-9 h-9 rounded-full bg-surface-soft border border-line flex items-center justify-center text-ink-500 hover:text-ink-900 transition-colors"
-        >
-          {hidden ? <Icon.Eye size={14}/> : <Icon.EyeOff size={14}/>}
-        </button>
-        <MiniHeatmap />
+        <div className="flex flex-col items-end justify-between h-full shrink-0">
+          <button
+            onClick={() => setHidden(h => !h)}
+            className="w-8 h-8 rounded-full bg-white border border-line2 flex items-center justify-center text-ink-400 hover:text-ink-800 shadow-sm transition-colors mb-2"
+          >
+            {hidden ? <Icon.Eye size={14}/> : <Icon.EyeOff size={14}/>}
+          </button>
+          {!hidden && <MiniSparkline data={D.PORTFOLIO_SPARK} positive={positive} />}
+        </div>
       </div>
 
       {/* Action pills */}
@@ -236,95 +238,23 @@ function RangeSelect() {
   );
 }
 
-function MiniHeatmap() {
-  // Holdings heatmap — each square = 1 holding slot, allocated proportionally to weight.
-  // Color = today's % change (red → grey → green). Hover for tooltip.
-  const D = window.DataLayer;
-  const { lang } = window.useT();
-  const [hover, setHover] = React.useState(null);
-
-  const SLOTS = 35; // 7 × 5
-  const holdings = D.ENRICHED.filter(a => a.cls !== 'cash');
-  const totalValue = holdings.reduce((s, a) => s + a.valueTHB, 0);
-
-  // Distribute slots proportionally, guarantee at least 1 slot for any holding > 1% weight
-  const allocated = [];
-  let used = 0;
-  holdings.forEach(a => {
-    const w = a.valueTHB / totalValue;
-    let n = Math.max(w > 0.02 ? 1 : 0, Math.round(w * SLOTS));
-    allocated.push({ a, n });
-    used += n;
-  });
-  // Adjust to fit exactly SLOTS
-  if (allocated.length > 0) {
-    while (used > SLOTS) { const i = allocated.findIndex(x => x.n > 1); if (i < 0) break; allocated[i].n--; used--; }
-    while (used < SLOTS) { allocated[0].n++; used++; }
-  }
-
-  // Build flat list of cells
-  const cells = [];
-  allocated.forEach(({ a, n }) => {
-    for (let i = 0; i < n; i++) cells.push(a);
-  });
-
-  // Color scale based on today's change
-  function cellColor(a) {
-    const p = a.dayChangePct;
-    if (p > 1.5)  return 'oklch(0.62 0.18 145)';                 // strong green
-    if (p > 0.3)  return 'oklch(0.72 0.14 145)';                 // mid green
-    if (p > -0.3) return 'oklch(0.82 0.04 250)';                 // neutral grey-blue
-    if (p > -1.5) return 'oklch(0.72 0.16 28)';                  // mid red
-    return 'oklch(0.62 0.22 28)';                                // strong red
-  }
-
+function MiniSparkline({ data, positive }) {
+  if (!data || data.length < 2) return null;
+  const minP = Math.min(...data), maxP = Math.max(...data);
+  const yRange = Math.max(maxP - minP, 1);
+  const w = 80, h = 32;
+  const pts = data.map((v, i) => {
+    const x = (i / (data.length - 1)) * w;
+    const y = h - ((v - minP) / yRange) * h;
+    return `${x.toFixed(1)},${y.toFixed(1)}`;
+  }).join(' ');
+  
+  const color = positive ? 'oklch(0.62 0.18 145)' : 'oklch(0.62 0.22 28)';
   return (
-    <div className="relative shrink-0 -mt-1">
-      <div className="grid grid-cols-7 gap-[3px]">
-        {cells.map((a, i) => (
-          <button
-            key={i}
-            onMouseEnter={() => setHover({ a, i })}
-            onMouseLeave={() => setHover(null)}
-            className="w-3.5 h-3.5 rounded-[3px] transition-transform hover:scale-125 hover:z-10 relative"
-            style={{
-              background: cellColor(a),
-              outline: hover?.a.ticker === a.ticker ? '1.5px solid oklch(0.15 0.01 250)' : 'none',
-              outlineOffset: '1px',
-            }}
-          />
-        ))}
-      </div>
-      <div className="mt-1.5 flex items-center justify-between text-[9px] text-ink-500 num">
-        <span className="flex items-center gap-1">
-          {lang === 'th' ? 'วันนี้' : 'Today'}
-          <window.InfoTip title={lang === 'th' ? 'แผนที่ความร้อนรายวัน' : 'Daily heatmap'} align="right" size={11} width="w-60">
-            {lang === 'th'
-              ? 'แต่ละช่องคือสินทรัพย์ 1 ตัว ขนาดสัดส่วนตามน้ำหนักในพอร์ต สีบอกผลตอบแทนวันนี้: เขียว = ขึ้น, แดง = ลง, เทา = แทบไม่เปลี่ยน ชี้ที่ช่องเพื่อดูชื่อและ %'
-              : 'Each square is one holding, sized by its weight in your portfolio. Color shows today’s move: green = up, red = down, grey = flat. Hover a square for its name and %.'}
-          </window.InfoTip>
-        </span>
-        <span className="flex items-center gap-1">
-          <span className="w-2 h-2 rounded-sm" style={{ background: 'oklch(0.62 0.22 28)' }}></span>
-          <span>−</span>
-          <span className="w-2 h-2 rounded-sm" style={{ background: 'oklch(0.82 0.04 250)' }}></span>
-          <span>0</span>
-          <span className="w-2 h-2 rounded-sm" style={{ background: 'oklch(0.62 0.18 145)' }}></span>
-          <span>+</span>
-        </span>
-      </div>
-      {hover && (
-        <div className="absolute right-0 top-full mt-1.5 z-20 bg-surface-inverse text-white rounded-lg shadow-pop px-3 py-2 text-[11px] min-w-[160px] pointer-events-none">
-          <div className="flex items-center justify-between gap-3">
-            <span className="num font-semibold">{hover.a.ticker}</span>
-            <span className={`num font-semibold ${hover.a.dayChangePct >= 0 ? 'text-gain' : 'text-loss'}`}>
-              {hover.a.dayChangePct >= 0 ? '+' : ''}{hover.a.dayChangePct.toFixed(2)}%
-            </span>
-          </div>
-          <div className="text-white/60 text-[10px] mt-0.5 truncate">{hover.a.name}</div>
-          <div className="text-white/80 num text-[10px] mt-1">{D.fmtTHB(hover.a.valueTHB, { compact: true })} · {((hover.a.valueTHB / totalValue) * 100).toFixed(1)}%</div>
-        </div>
-      )}
+    <div className="relative shrink-0 flex items-center justify-end" style={{ width: w, height: h }}>
+      <svg width={w} height={h} viewBox={`0 0 ${w} ${h}`} className="overflow-visible">
+        <polyline points={pts} fill="none" stroke={color} strokeWidth="2.5" strokeLinecap="round" strokeLinejoin="round" />
+      </svg>
     </div>
   );
 }
