@@ -739,20 +739,41 @@ function App() {
       }
       
       try {
-        const res = await fetch(`/api/price?ticker=${encodeURIComponent(queryTicker)}`);
-        if (res.ok) {
-          const data = await res.json();
-          if (data.price) {
-            held.price = data.price;
-            if (data.prevClose) {
-              held.dayChangePct = ((data.price - data.prevClose) / data.prevClose) * 100;
+        const fetchPriceWithFallback = async (tck) => {
+          try {
+            const res = await fetch(`/api/price?ticker=${encodeURIComponent(tck)}`);
+            if (res.ok) return await res.json();
+          } catch(e) {}
+          try {
+            const yfUrl = `https://query1.finance.yahoo.com/v8/finance/chart/${encodeURIComponent(tck)}?interval=1d`;
+            const res = await fetch(`https://corsproxy.io/?${encodeURIComponent(yfUrl)}`);
+            if (res.ok) {
+              const data = await res.json();
+              const result = data.chart?.result?.[0];
+              if (result && result.meta) {
+                return {
+                  price: result.meta.regularMarketPrice,
+                  prevClose: result.meta.chartPreviousClose || result.meta.previousClose,
+                  name: result.meta.shortName || result.meta.longName || tck,
+                  currency: result.meta.currency
+                };
+              }
             }
-            // Update sparkline with the new price as the latest point
-            if (held.spark && held.spark.length > 0) {
-              held.spark[held.spark.length - 1] = data.price;
-            }
-            updatedCount++;
+          } catch(e) {}
+          return null;
+        };
+
+        const data = await fetchPriceWithFallback(queryTicker);
+        if (data && data.price) {
+          held.price = data.price;
+          if (data.prevClose) {
+            held.dayChangePct = ((data.price - data.prevClose) / data.prevClose) * 100;
           }
+          // Update sparkline with the new price as the latest point
+          if (held.spark && held.spark.length > 0) {
+            held.spark[held.spark.length - 1] = data.price;
+          }
+          updatedCount++;
         }
       } catch (err) {
         console.error('Failed to sync', queryTicker, err);
@@ -783,16 +804,35 @@ function App() {
           if (w.cls === 'fund') continue;
           
           try {
-            const res = await fetch(`/api/price?ticker=${encodeURIComponent(queryTicker)}`);
-            if (res.ok) {
-              const data = await res.json();
-              if (data.price) {
-                w.price = data.price;
-                if (data.prevClose) {
-                  w.prev = data.prevClose; // Update previous close for change calculations
+            const fetchPriceWithFallback = async (tck) => {
+              try {
+                const res = await fetch(`/api/price?ticker=${encodeURIComponent(tck)}`);
+                if (res.ok) return await res.json();
+              } catch(e) {}
+              try {
+                const yfUrl = `https://query1.finance.yahoo.com/v8/finance/chart/${encodeURIComponent(tck)}?interval=1d`;
+                const res = await fetch(`https://corsproxy.io/?${encodeURIComponent(yfUrl)}`);
+                if (res.ok) {
+                  const data = await res.json();
+                  const result = data.chart?.result?.[0];
+                  if (result && result.meta) {
+                    return {
+                      price: result.meta.regularMarketPrice,
+                      prevClose: result.meta.chartPreviousClose || result.meta.previousClose
+                    };
+                  }
                 }
-                watchUpdated = true;
+              } catch(e) {}
+              return null;
+            };
+
+            const data = await fetchPriceWithFallback(queryTicker);
+            if (data && data.price) {
+              w.price = data.price;
+              if (data.prevClose) {
+                w.prev = data.prevClose; // Update previous close for change calculations
               }
+              watchUpdated = true;
             }
           } catch (err) {
             console.error('Failed to sync watchlist', queryTicker, err);
@@ -1404,7 +1444,7 @@ function App() {
           <div className="max-w-[1440px] mx-auto">
             <TopNav page={page} setPage={setPage}/>
 
-            <div key={`${page}-${refreshKey}`} className="fade-in space-y-4">
+            <div key={page} className="fade-in space-y-4">
               {page === 'overview' && <OverviewPage/>}
               {page === 'holdings' && <window.HoldingsPage/>}
               {page === 'cashflow' && <window.CashflowPage/>}
