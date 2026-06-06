@@ -618,12 +618,29 @@ function TransactionsBento() {
             />
           </div>
           <button
-            title={lang === 'th' ? 'ตัวกรอง' : 'Filters'}
+            onClick={() => nav.openLedger()}
+            title={lang === 'th' ? 'เปิดสมุดบัญชีแบบเต็ม' : 'Open Full Ledger'}
             className="w-8 h-8 rounded-full bg-surface-soft border border-line flex items-center justify-center text-ink-700 hover:bg-line hover:text-ink-900 cursor-pointer transition-colors"
           >
             <I2.Sliders size={12}/>
           </button>
           <button
+            onClick={() => {
+              const headers = ['Date', 'Type', 'Asset', 'Broker', 'Units', 'Price', 'Fee', 'Total', 'Currency'];
+              const csv = [headers.join(',')];
+              D2.TRANSACTIONS.forEach(tx => {
+                const date = tx.date.toISOString().split('T')[0];
+                csv.push([date, tx.type, tx.ticker, tx.broker, tx.units || '', tx.price || '', tx.fee || '', tx.total || '', tx.ccy].join(','));
+              });
+              const blob = new Blob([csv.join('\n')], { type: 'text/csv' });
+              const url = URL.createObjectURL(blob);
+              const a = document.createElement('a');
+              a.href = url;
+              a.download = `transactions_${new Date().toISOString().split('T')[0]}.csv`;
+              document.body.appendChild(a);
+              a.click();
+              document.body.removeChild(a);
+            }}
             title={lang === 'th' ? 'ดาวน์โหลด CSV' : 'Download CSV'}
             className="w-8 h-8 rounded-full bg-surface-soft border border-line flex items-center justify-center text-ink-700 hover:bg-line hover:text-ink-900 cursor-pointer transition-colors"
           >

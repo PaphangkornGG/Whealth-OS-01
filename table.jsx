@@ -144,7 +144,26 @@ function AssetTable({ externalFilter, onClearFilter }) {
               ))}
             </div>
           )}
-          <button className="text-ink-500 hover:text-ink-700 transition-colors p-1.5 rounded-md hover:bg-ink-100" title="Export CSV">
+          <button 
+            onClick={() => {
+              const headers = ['Date', 'Type', 'Asset', 'Broker', 'Units', 'Price', 'Fee', 'Total', 'Currency'];
+              const csv = [headers.join(',')];
+              D.TRANSACTIONS.forEach(tx => {
+                const date = tx.date.toISOString().split('T')[0];
+                csv.push([date, tx.type, tx.ticker, tx.broker, tx.units || '', tx.price || '', tx.fee || '', tx.total || '', tx.ccy].join(','));
+              });
+              const blob = new Blob([csv.join('\n')], { type: 'text/csv' });
+              const url = URL.createObjectURL(blob);
+              const a = document.createElement('a');
+              a.href = url;
+              a.download = `transactions_ledger_${new Date().toISOString().split('T')[0]}.csv`;
+              document.body.appendChild(a);
+              a.click();
+              document.body.removeChild(a);
+            }}
+            className="text-ink-500 hover:text-ink-700 transition-colors p-1.5 rounded-md hover:bg-ink-100" 
+            title={lang === 'th' ? 'ส่งออก CSV' : 'Export CSV'}
+          >
             <Icon.Download size={14}/>
           </button>
         </div>
