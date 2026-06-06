@@ -154,14 +154,13 @@ function BalanceCard() {
             <span className="text-ink-500">{lang === 'th' ? 'เดือนนี้ดีขึ้น' : 'Balance increase, good progress.'}</span>
           </div>
         </div>
-        <div className="flex flex-col items-end justify-between h-full shrink-0">
+        <div className="flex flex-col items-end justify-start h-full shrink-0">
           <button
             onClick={() => setHidden(h => !h)}
-            className="w-8 h-8 rounded-full bg-white border border-line2 flex items-center justify-center text-ink-400 hover:text-ink-800 shadow-sm transition-colors mb-2"
+            className="w-8 h-8 rounded-full bg-white border border-line2 flex items-center justify-center text-ink-400 hover:text-ink-800 shadow-sm transition-colors"
           >
             {hidden ? <Icon.Eye size={14}/> : <Icon.EyeOff size={14}/>}
           </button>
-          {!hidden && <MiniSparkline data={D.PORTFOLIO_SPARK} positive={positive} />}
         </div>
       </div>
 
@@ -238,26 +237,7 @@ function RangeSelect() {
   );
 }
 
-function MiniSparkline({ data, positive }) {
-  if (!data || data.length < 2) return null;
-  const minP = Math.min(...data), maxP = Math.max(...data);
-  const yRange = Math.max(maxP - minP, 1);
-  const w = 80, h = 32;
-  const pts = data.map((v, i) => {
-    const x = (i / (data.length - 1)) * w;
-    const y = h - ((v - minP) / yRange) * h;
-    return `${x.toFixed(1)},${y.toFixed(1)}`;
-  }).join(' ');
-  
-  const color = positive ? 'oklch(0.62 0.18 145)' : 'oklch(0.62 0.22 28)';
-  return (
-    <div className="relative shrink-0 flex items-center justify-end" style={{ width: w, height: h }}>
-      <svg width={w} height={h} viewBox={`0 0 ${w} ${h}`} className="overflow-visible">
-        <polyline points={pts} fill="none" stroke={color} strokeWidth="2.5" strokeLinecap="round" strokeLinejoin="round" />
-      </svg>
-    </div>
-  );
-}
+
 
 // ─── 2. Total P/L card (unrealized gain/loss) ─────────────────────────
 // One of the two "mover" slots at the bottom of the P/L card. Defaults to a
