@@ -24,24 +24,58 @@
   }
 
   D.getRangeDataAsync = async function(range) {
-    const [set50Hist, sp500Hist, acwiHist] = await Promise.all([
+    let [set50Hist, sp500Hist, acwiHist] = await Promise.all([
       fetchHistory('^SET.BK', range),
       fetchHistory('^GSPC', range),
       fetchHistory('ACWI', range)
     ]);
 
+    // Fallback if backend API is not available (e.g. GitHub Pages static hosting)
+    let isMocking = false;
+    let daysToMock = range === '1D' ? 30 : range === '1W' ? 7 : range === '1M' ? 30 : range === '3M' ? 90 : range === '1Y' ? 365 : 730;
+    
+    if (set50Hist.length === 0) {
+      isMocking = true;
+      const now = Date.now();
+      const intervalMs = range === '1D' ? 900000 : range === '1W' ? 3600000 : 86400000; // 15m, 1h, 1d
+      const points = range === '1D' ? 30 : range === '1W' ? 40 : daysToMock;
+      
+      const genMock = (seed, basePrice, slope) => {
+        const raw = D.sparkSeries(seed, points, slope);
+        const ratio = basePrice / raw[points - 1];
+        return raw.map((v, i) => ({
+          date: (now - (points - 1 - i) * intervalMs) / 1000,
+          price: v * ratio
+        }));
+      };
+      
+      set50Hist = genMock(50, 1000, 0.05);
+      sp500Hist = genMock(500, 5000, 0.08);
+      acwiHist = genMock(100, 100, 0.06);
+    }
+
     const holdings = D.ENRICHED.filter(a => a.cls !== 'cash');
     const tickerHists = {};
     const fetchPromises = holdings.map(async (a) => {
-      let hist = await fetchHistory(a.ticker, range);
+      let hist = isMocking ? [] : await fetchHistory(a.ticker, range);
       if (hist.length === 0) {
-        // Fallback for Thai Mutual Funds or missing data: shape it like SET50
         const currentPrice = a.price || 10;
-        const lastSet50Price = set50Hist[set50Hist.length - 1]?.price || 100;
-        hist = set50Hist.map(d => ({
-          date: d.date,
-          price: currentPrice * (d.price / lastSet50Price)
-        }));
+        if (isMocking) {
+          const seed = a.ticker.charCodeAt(0) + a.ticker.charCodeAt(a.ticker.length - 1);
+          const raw = D.sparkSeries(seed, set50Hist.length, 0.05);
+          const ratio = currentPrice / raw[raw.length - 1];
+          hist = set50Hist.map((d, i) => ({
+            date: d.date,
+            price: raw[i] * ratio
+          }));
+        } else {
+          // Fallback for Thai Mutual Funds or missing data: shape it like SET50
+          const lastSet50Price = set50Hist[set50Hist.length - 1]?.price || 100;
+          hist = set50Hist.map(d => ({
+            date: d.date,
+            price: currentPrice * (d.price / lastSet50Price)
+          }));
+        }
       }
       tickerHists[a.ticker] = hist;
     });
