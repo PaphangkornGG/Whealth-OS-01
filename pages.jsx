@@ -1403,7 +1403,7 @@ function SettingsPage() {
                 if (window.supabaseClient) {
                   window.supabaseClient.from('transactions')
                     .delete()
-                    .neq('id', 'dummy_id')
+                    .neq('id', '00000000-0000-0000-0000-000000000000')
                     .then(({ error }) => {
                       if (error) {
                         console.error('Failed to clear Supabase history:', error);
