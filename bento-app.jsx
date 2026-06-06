@@ -1307,7 +1307,9 @@ function App() {
       ccy,
       total: tx.type === 'dividend' ? tx.amount : tx.amount * tx.price,
     };
-    D_.TRANSACTIONS.unshift(newTx);
+    if (!D_.TRANSACTIONS.find(t => t.id === newTx.id)) {
+      D_.TRANSACTIONS.unshift(newTx);
+    }
 
     // 2) Mutate the matching ENRICHED position so portfolio totals update.
     //    On a BUY into a new (ticker, broker) lot, create a fresh position.

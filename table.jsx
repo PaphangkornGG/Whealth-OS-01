@@ -197,7 +197,7 @@ function AssetTable({ externalFilter, onClearFilter }) {
               const cls = ASSET_CLASSES[a.cls] || { color: 'oklch(0.62 0.015 250)', label: a.cls || 'Other' };
               const sparkUp = a.spark && a.spark.length > 0 ? a.spark[a.spark.length-1] >= a.spark[0] : true;
               return (
-                <React.Fragment key={a.ticker}>
+                <React.Fragment key={`${a.ticker}-${a.broker}`}>
                   <tr
                     onClick={() => setSelected(isSel ? null : a.ticker)}
                     className={`border-t border-ink-200 cursor-pointer transition-colors ${isSel ? 'bg-ink-100' : 'hover:bg-ink-100/60'}`}
