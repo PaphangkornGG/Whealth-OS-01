@@ -662,7 +662,7 @@ function TransactionsBento() {
             </tr>
           </thead>
           <tbody>
-            {rows.map(tx => {
+            {rows.map((tx, i) => {
               const cls = D2.ASSET_CLASSES[tx.cls] || { color: 'oklch(0.62 0.015 250)', label: tx.cls || 'Other' };
               const broker = D2.BROKERS[tx.broker];
               const status = STATUS_TONES[tx.type] || { label: tx.type || 'Unknown', cls: 'bg-ink-300 text-ink-800' };
@@ -685,7 +685,7 @@ function TransactionsBento() {
               }
               const isPositive = tx.type === 'buy' || tx.type === 'dividend';
               return (
-                <tr key={tx.id} className="border-t border-line hover:bg-surface-soft transition-colors">
+                <tr key={`${tx.id}-${i}`} className="border-t border-line hover:bg-surface-soft transition-colors">
                   <td className="px-5 py-3">
                     <div className="flex items-center gap-2.5">
                       <StockLogo ticker={tx.ticker} cls={tx.cls} size={28} />

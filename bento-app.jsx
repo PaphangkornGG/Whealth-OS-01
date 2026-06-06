@@ -1291,7 +1291,7 @@ function App() {
           : 'th');
     const newTx = {
       // Temporary ID for UI rendering. Sync re-populates proper UUID.
-      id: `temp-${Date.now()}`,
+      id: `temp-${Date.now()}-${Math.random().toString(36).substring(2, 7)}`,
       // tx.date is a YYYY-MM-DD string from the modal's <input type="date">.
       // Anchor it to local noon so the date doesn't shift across timezones.
       date: tx.date ? new Date(`${tx.date}T12:00:00`) : new Date(),
