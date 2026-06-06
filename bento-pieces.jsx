@@ -132,7 +132,6 @@ function BalanceCard() {
         </div>
         <div className="flex items-center gap-2">
           <CcySelect value={ccy} onChange={setCcy}/>
-          <RangeSelect/>
         </div>
       </div>
 
