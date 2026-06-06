@@ -1412,8 +1412,25 @@ function App() {
             </div>
           </div>
 
-          <window.QuickTxModal open={modalOpen} onClose={() => { setModalOpen(false); setModalPrefill(null); setEditTx(null); }} onSave={handleSave} prefill={modalPrefill} initialData={editTx}/>
-          <window.TransactionLedger open={ledgerOpen} onClose={() => setLedgerOpen(false)} onEditTx={(tx) => { setEditTx(tx); setModalOpen(true); setLedgerOpen(false); }} onDeleteTx={handleDeleteTx}/>
+          <div className="modals-container">
+            {modalOpen && (
+              <window.QuickTxModal 
+                open={true} 
+                onClose={() => { setModalOpen(false); setModalPrefill(null); setEditTx(null); }} 
+                onSave={handleSave} 
+                prefill={modalPrefill} 
+                initialData={editTx}
+              />
+            )}
+            {ledgerOpen && (
+              <window.TransactionLedger 
+                open={true} 
+                onClose={() => setLedgerOpen(false)} 
+                onEditTx={(tx) => { setEditTx(tx); setModalOpen(true); setLedgerOpen(false); }} 
+                onDeleteTx={handleDeleteTx}
+              />
+            )}
+          </div>
           <Toast show={!!toast}>{toast}</Toast>
         </div>
       </NavContext.Provider>
