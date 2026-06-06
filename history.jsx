@@ -149,10 +149,10 @@
         const tx = txs[currentTxsIdx];
         if (tx.type === 'buy') {
           inventory[tx.ticker] = (inventory[tx.ticker] || 0) + tx.units;
-          costAtTime += tx.total;
+          costAtTime += tx.ccy === 'USD' ? tx.total * D.FX.USD_THB : tx.total;
         } else if (tx.type === 'sell') {
           inventory[tx.ticker] = Math.max(0, (inventory[tx.ticker] || 0) - tx.units);
-          costAtTime -= tx.total;
+          costAtTime -= tx.ccy === 'USD' ? tx.total * D.FX.USD_THB : tx.total;
         }
         currentTxsIdx++;
       }

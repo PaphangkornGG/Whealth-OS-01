@@ -1297,7 +1297,7 @@ function App() {
       date: tx.date ? new Date(`${tx.date}T12:00:00`) : new Date(),
       type: tx.type,
       ticker: tickerUpper,
-      name: held?.name || tickerUpper,
+      name: tx.name || held?.name || tickerUpper,
       cls,
       broker: brokerId,
       amount: tx.type === 'dividend' ? null : tx.amount,
@@ -1314,7 +1314,7 @@ function App() {
     if (!held && tx.type === 'buy' && brokerId) {
       held = {
         ticker: tickerUpper,
-        name: sibling?.name || tickerUpper,
+        name: tx.name || sibling?.name || tickerUpper,
         cls,
         ccy,
         broker: brokerId,
