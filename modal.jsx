@@ -269,13 +269,22 @@ function QuickTxModal({ open, onClose, onSave, initialData = null, prefill = nul
         }
 
         const fetchPriceWithFallback = async (tck) => {
+          const formatYfTicker = (t) => {
+            if (t === 'BRK.B') return 'BRK-B';
+            if (t === 'BRK.A') return 'BRK-A';
+            if (t === 'BF.B') return 'BF-B';
+            if (t === 'BF.A') return 'BF-A';
+            return t;
+          };
+          const yfTck = formatYfTicker(tck);
+
           try {
-            const res = await fetch(`/api/price?ticker=${encodeURIComponent(tck)}`, { signal: controller.signal });
+            const res = await fetch(`/api/price?ticker=${encodeURIComponent(yfTck)}`, { signal: controller.signal });
             if (res.ok) return await res.json();
           } catch (e) {}
           
           try {
-            const yfUrl = `https://query1.finance.yahoo.com/v8/finance/chart/${encodeURIComponent(tck)}`;
+            const yfUrl = `https://query1.finance.yahoo.com/v8/finance/chart/${encodeURIComponent(yfTck)}`;
             const proxyUrl = `https://corsproxy.io/?${encodeURIComponent(yfUrl)}`;
             const res = await fetch(proxyUrl, { signal: controller.signal });
             if (res.ok) {

@@ -740,12 +740,21 @@ function App() {
       
       try {
         const fetchPriceWithFallback = async (tck) => {
+          const formatYfTicker = (t) => {
+            if (t === 'BRK.B') return 'BRK-B';
+            if (t === 'BRK.A') return 'BRK-A';
+            if (t === 'BF.B') return 'BF-B';
+            if (t === 'BF.A') return 'BF-A';
+            return t;
+          };
+          const yfTck = formatYfTicker(tck);
+
           try {
-            const res = await fetch(`/api/price?ticker=${encodeURIComponent(tck)}`);
+            const res = await fetch(`/api/price?ticker=${encodeURIComponent(yfTck)}`);
             if (res.ok) return await res.json();
           } catch(e) {}
           try {
-            const yfUrl = `https://query1.finance.yahoo.com/v8/finance/chart/${encodeURIComponent(tck)}?interval=1d`;
+            const yfUrl = `https://query1.finance.yahoo.com/v8/finance/chart/${encodeURIComponent(yfTck)}?interval=1d`;
             const res = await fetch(`https://corsproxy.io/?${encodeURIComponent(yfUrl)}`);
             if (res.ok) {
               const data = await res.json();
@@ -805,12 +814,21 @@ function App() {
           
           try {
             const fetchPriceWithFallback = async (tck) => {
+              const formatYfTicker = (t) => {
+                if (t === 'BRK.B') return 'BRK-B';
+                if (t === 'BRK.A') return 'BRK-A';
+                if (t === 'BF.B') return 'BF-B';
+                if (t === 'BF.A') return 'BF-A';
+                return t;
+              };
+              const yfTck = formatYfTicker(tck);
+
               try {
-                const res = await fetch(`/api/price?ticker=${encodeURIComponent(tck)}`);
+                const res = await fetch(`/api/price?ticker=${encodeURIComponent(yfTck)}`);
                 if (res.ok) return await res.json();
               } catch(e) {}
               try {
-                const yfUrl = `https://query1.finance.yahoo.com/v8/finance/chart/${encodeURIComponent(tck)}?interval=1d`;
+                const yfUrl = `https://query1.finance.yahoo.com/v8/finance/chart/${encodeURIComponent(yfTck)}?interval=1d`;
                 const res = await fetch(`https://corsproxy.io/?${encodeURIComponent(yfUrl)}`);
                 if (res.ok) {
                   const data = await res.json();
