@@ -189,33 +189,17 @@ function CcySelect({ value, onChange }) {
       >
         <span className="w-3.5 h-3.5 rounded-full bg-brand/20 flex items-center justify-center text-[8px]">฿</span>
         {value}
-        <Icon.ChevronDown size={10}/>
-      </button>
-      {open && (
-        <>
-          <div className="fixed inset-0 z-30" onClick={() => setOpen(false)}></div>
-          <div className="absolute right-0 top-full mt-1 z-40 bg-card border border-line2 rounded-xl shadow-pop py-1 min-w-[80px]">
-            {opts.map(o => (
-              <button key={o} onClick={() => { onChange(o); setOpen(false); }} className="w-full text-left px-3 py-1.5 text-[12px] hover:bg-surface-soft">{o}</button>
-            ))}
-          </div>
-        </>
-      )}
-    </div>
-  );
-}
-
-function RangeSelect() {
+        <Icon.ChevronDownfunction RangeSelect({ value, onChange }) {
   const [open, setOpen] = React.useState(false);
-  const [val, setVal] = React.useState('ALL TIME');
-  const opts = ['1M', '3M', '1Y', 'YTD', 'ALL TIME'];
+  const opts = ['1M', '3M', '1Y', 'YTD', 'ALL'];
+  const displayVal = value === 'ALL' ? 'ALL TIME' : value;
   return (
     <div className="relative">
       <button
         onClick={() => setOpen(o => !o)}
         className="flex items-center gap-1 bg-white border border-line2 rounded-full px-2.5 py-1 text-[11px] font-semibold text-ink-700 hover:bg-surface-soft transition-colors"
       >
-        {val}
+        {displayVal}
         <Icon.ChevronDown size={10}/>
       </button>
       {open && (
@@ -223,7 +207,7 @@ function RangeSelect() {
           <div className="fixed inset-0 z-30" onClick={() => setOpen(false)}></div>
           <div className="absolute right-0 top-full mt-1 z-40 bg-card border border-line2 rounded-xl shadow-pop py-1 min-w-[110px]">
             {opts.map(o => (
-              <button key={o} onClick={() => { setVal(o); setOpen(false); }} className="w-full text-left px-3 py-1.5 text-[12px] hover:bg-surface-soft">{o}</button>
+              <button key={o} onClick={() => { onChange(o); setOpen(false); }} className="w-full text-left px-3 py-1.5 text-[12px] hover:bg-surface-soft">{o === 'ALL' ? 'ALL TIME' : o}</button>
             ))}
           </div>
         </>
@@ -231,8 +215,6 @@ function RangeSelect() {
     </div>
   );
 }
-
-
 
 // ─── 2. Total P/L card (unrealized gain/loss) ─────────────────────────
 // One of the two "mover" slots at the bottom of the P/L card. Defaults to a
@@ -285,20 +267,54 @@ function MoverSlot({ assets, value, exclude, onChange, lang }) {
 
 function PLCard() {
   const { lang } = window.useT();
-  const unrealized = D.TOTAL_THB - D.TOTAL_COST_THB;
-  const positive = unrealized >= 0;
-  const totalReturnPct = D.TOTAL_COST_THB > 0 ? (unrealized / D.TOTAL_COST_THB) * 100 : 0;
+  const D = window.DataLayer;
+  const [range, setRange] = React.useState('ALL');
+  const [data, setData] = React.useState(null);
 
-  // Build a P/L trend from the portfolio sparkline → daily portfolio value minus a constant cost basis.
-  const spark = D.PORTFOLIO_SPARK;
-  const endSpark = spark[spark.length - 1];
-  const scale = endSpark > 0 ? D.TOTAL_THB / endSpark : 0;
-  const plSeries = spark.map(v => v * scale - D.TOTAL_COST_THB);
+  React.useEffect(() => {
+    let active = true;
+    if (D.getRangeDataAsync) {
+      D.getRangeDataAsync(range).then(res => {
+        if (active) setData(res);
+      });
+    }
+    return () => { active = false; };
+  }, [range, D.TRANSACTIONS.length]);
+
+  const unrealized = D.TOTAL_THB - D.TOTAL_COST_THB;
+  let periodChange = unrealized;
+  let periodReturnPct = D.TOTAL_COST_THB > 0 ? (unrealized / D.TOTAL_COST_THB) * 100 : 0;
+  let plSeries = [];
+
+  if (data && data.portfolio.length > 0) {
+    plSeries = data.portfolio.map((v, i) => v - data.costBasis[i]);
+    const startPL = plSeries[0];
+    const endPL = plSeries[plSeries.length - 1];
+    if (range === 'ALL') {
+      periodChange = endPL; // All time P/L is simply the current P/L
+      periodReturnPct = data.costBasis[data.costBasis.length - 1] > 0 ? (endPL / data.costBasis[data.costBasis.length - 1]) * 100 : 0;
+    } else {
+      periodChange = endPL - startPL;
+      const startValue = data.portfolio[0];
+      if (startValue > 0) {
+        periodReturnPct = (periodChange / startValue) * 100;
+      }
+    }
+  } else {
+    // Fallback while loading
+    const spark = D.PORTFOLIO_SPARK;
+    const endSpark = spark[spark.length - 1];
+    const scale = endSpark > 0 ? D.TOTAL_THB / endSpark : 0;
+    plSeries = spark.map(v => v * scale - D.TOTAL_COST_THB);
+  }
+
+  const positive = periodChange >= 0;
+  
   const minP = Math.min(...plSeries), maxP = Math.max(...plSeries);
   const yRange = Math.max(maxP - minP, 1);
   const w = 240, h = 60;
   const pts = plSeries.map((v, i) => {
-    const x = (i / (plSeries.length - 1)) * w;
+    const x = (i / Math.max(1, plSeries.length - 1)) * w;
     const y = h - ((v - minP) / yRange) * h;
     return `${x.toFixed(1)},${y.toFixed(1)}`;
   }).join(' ');
@@ -306,9 +322,7 @@ function PLCard() {
   const lineStroke = positive ? 'oklch(0.62 0.18 145)' : 'oklch(0.62 0.22 28)';
   const areaFill = positive ? 'oklch(0.62 0.18 145 / 0.14)' : 'oklch(0.62 0.22 28 / 0.14)';
 
-  // Bottom "movers" — user-selectable. Defaults to the two biggest movers
-  // by absolute unrealized P/L, but each slot is a dropdown so the user can
-  // track any holding they care about. Choice persists across reloads.
+  // Bottom "movers"
   const allMovers = React.useMemo(() => [...D.ENRICHED]
     .map(a => ({ ...a, unrealTHB: D.toTHB(a.unrealized, a.ccy) }))
     .sort((a, b) => Math.abs(b.unrealTHB) - Math.abs(a.unrealTHB)), []);
@@ -338,27 +352,28 @@ function PLCard() {
               : 'Your “paper” gain/loss = current value − what you paid. It isn’t realized until you sell. The % is your return on cost. • Tap either box at the bottom to pick which asset to track.'}
           </window.InfoTip>
         </div>
-        <RangeSelect/>
+        <RangeSelect value={range} onChange={setRange}/>
       </div>
 
       <div className="mt-5 flex items-end gap-2">
         <div className="num font-bold tracking-tight flex items-baseline">
           <span className={positive ? 'text-gain' : 'text-loss'} style={{ fontSize: '28px', lineHeight: '1' }}>
-            {positive ? '+' : '−'}฿{Math.floor(Math.abs(unrealized)).toLocaleString('en-US')}
+            {positive ? '+' : '−'}฿{Math.floor(Math.abs(periodChange)).toLocaleString('en-US')}
           </span>
         </div>
         <Pill tone={positive ? 'gain' : 'loss'} size="sm" className="mb-1">
           {positive ? <Icon.ArrowUp size={10}/> : <Icon.ArrowDown size={10}/>}
-          {positive ? '+' : ''}{totalReturnPct.toFixed(2)}%
+          {positive ? '+' : ''}{periodReturnPct.toFixed(2)}%
         </Pill>
       </div>
 
-      <div className="mt-3 text-[12px] text-ink-500">
-        {lang === 'th' ? `คิดจากต้นทุนรวม ${D.fmtTHB(D.TOTAL_COST_THB, { compact: true })}` : `On cost basis of ${D.fmtTHB(D.TOTAL_COST_THB, { compact: true })}`}
+      <div className="mt-3 text-[12px] text-ink-500 h-4">
+        {!data && <span className="animate-pulse">{lang === 'th' ? 'กำลังโหลดข้อมูล...' : 'Loading history...'}</span>}
+        {data && (lang === 'th' ? `คิดจากต้นทุนรวม ${D.fmtTHB(D.TOTAL_COST_THB, { compact: true })}` : `On cost basis of ${D.fmtTHB(D.TOTAL_COST_THB, { compact: true })}`)}
       </div>
 
       {/* Trend line */}
-      <div className="mt-3">
+      <div className="mt-2">
         <svg width="100%" viewBox={`0 0 ${w} ${h}`} preserveAspectRatio="none" className="block" style={{ height: 60 }}>
           <defs>
             <linearGradient id="plGrad" x1="0" y1="0" x2="0" y2="1">

@@ -30,6 +30,24 @@
       fetchHistory('ACWI', range)
     ]);
 
+    const holdings = D.ENRICHED.filter(a => a.cls !== 'cash');
+    const tickerHists = {};
+    const fetchPromises = holdings.map(async (a) => {
+      let hist = await fetchHistory(a.ticker, range);
+      if (hist.length === 0) {
+        // Fallback for Thai Mutual Funds or missing data: shape it like SET50
+        const currentPrice = a.price || 10;
+        const lastSet50Price = set50Hist[set50Hist.length - 1]?.price || 100;
+        hist = set50Hist.map(d => ({
+          date: d.date,
+          price: currentPrice * (d.price / lastSet50Price)
+        }));
+      }
+      tickerHists[a.ticker] = hist;
+    });
+    
+    await Promise.all(fetchPromises);
+
     // Gather all unique timestamps to align the series
     const timeMap = new Set();
     set50Hist.forEach(d => timeMap.add(d.date));
@@ -38,7 +56,6 @@
     
     let times = Array.from(timeMap).sort((a, b) => a - b);
     if (times.length === 0) {
-      // Fallback if APIs fail
       times = Array.from({length: 30}, (_, i) => Date.now()/1000 - (30-i)*86400);
     }
 
@@ -57,16 +74,22 @@
     let sp500Idx = 0;
     let acwiIdx = 0;
 
-    // Calculate overall return ratio to scale the cost basis for the portfolio line
-    const totalCost = D.TOTAL_COST_THB || 1;
-    const currentTotal = D.TOTAL_THB || 1;
-    const returnRatio = currentTotal / totalCost;
+    const histCursors = {};
+    const lastPrice = {};
+    for (const a of holdings) {
+      histCursors[a.ticker] = 0;
+      lastPrice[a.ticker] = tickerHists[a.ticker]?.[0]?.price || a.price;
+    }
 
-    // For cost basis, we must replay transactions chronologically
     const txs = [...D.TRANSACTIONS].reverse();
+    let currentTxsIdx = 0;
+    const inventory = {};
+    let costAtTime = 0;
+    
+    const currentInvested = holdings.reduce((s, a) => s + a.valueTHB, 0);
+    const cashBuffer = Math.max(0, D.TOTAL_THB - currentInvested);
 
     for (const t of times) {
-      // Find latest benchmark values up to this timestamp
       while (set50Idx < set50Hist.length && set50Hist[set50Idx].date <= t) {
         lastSet50 = set50Hist[set50Idx].price;
         set50Idx++;
@@ -80,31 +103,49 @@
         acwiIdx++;
       }
 
-      // Calculate cost basis up to this timestamp
-      let costAtTime = 0;
-      for (const tx of txs) {
-        if (tx.date.getTime() / 1000 <= t) {
-          if (tx.type === 'buy') costAtTime += tx.total;
-          if (tx.type === 'sell') {
-            costAtTime -= tx.total;
-          }
-        } else {
-          break; // Since txs are chronological, we can stop early
+      for (const a of holdings) {
+        const hist = tickerHists[a.ticker];
+        while (histCursors[a.ticker] < hist.length && hist[histCursors[a.ticker]].date <= t) {
+          lastPrice[a.ticker] = hist[histCursors[a.ticker]].price;
+          histCursors[a.ticker]++;
+        }
+      }
+
+      while (currentTxsIdx < txs.length && txs[currentTxsIdx].date.getTime() / 1000 <= t) {
+        const tx = txs[currentTxsIdx];
+        if (tx.type === 'buy') {
+          inventory[tx.ticker] = (inventory[tx.ticker] || 0) + tx.units;
+          costAtTime += tx.total;
+        } else if (tx.type === 'sell') {
+          inventory[tx.ticker] = Math.max(0, (inventory[tx.ticker] || 0) - tx.units);
+          costAtTime -= tx.total;
+        }
+        currentTxsIdx++;
+      }
+      
+      let investedValueTHB = 0;
+      for (const tck of Object.keys(inventory)) {
+        const units = inventory[tck];
+        if (units > 0) {
+          const price = lastPrice[tck] || 0;
+          const a = holdings.find(x => x.ticker === tck);
+          const fx = a?.ccy === 'USD' ? D.FX.USD_THB : 1;
+          investedValueTHB += (units * price * fx);
         }
       }
       
-      if (costAtTime < 0) costAtTime = 0;
-      if (costAtTime === 0 && D.TRANSACTIONS.length === 0) costAtTime = D.TOTAL_COST_THB;
+      const portNav = investedValueTHB + cashBuffer;
+      const safeCost = Math.max(0, costAtTime) + cashBuffer;
 
       set50Vals.push(lastSet50);
       sp500Vals.push(lastSp500);
       acwiVals.push(lastAcwi);
-      costVals.push(costAtTime);
-      portVals.push(costAtTime * returnRatio);
+      costVals.push(safeCost);
+      portVals.push(portNav);
       dateVals.push(new Date(t * 1000));
     }
 
-    // Scale benchmarks to match TOTAL_THB at the end for visual comparison
+    const currentTotal = D.TOTAL_THB || 1;
     const finalSet50 = set50Vals[set50Vals.length - 1] || 1;
     const finalSp500 = sp500Vals[sp500Vals.length - 1] || 1;
     const finalAcwi = acwiVals[acwiVals.length - 1] || 1;
