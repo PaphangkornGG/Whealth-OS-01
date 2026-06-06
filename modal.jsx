@@ -268,47 +268,65 @@ function QuickTxModal({ open, onClose, onSave, initialData = null, prefill = nul
           secondaryTicker = `${upper}.BK`; // Fallback to Thai stock if US fetch fails (handles general short codes)
         }
 
-        const res = await fetch(`/api/price?ticker=${encodeURIComponent(primaryTicker)}`, { signal: controller.signal });
-        if (res.ok) {
-          const data = await res.json();
-          if (data.price) {
-            setPrice(String(data.price));
-            setPriceSynced(true);
-            if (data.name) setName(data.name);
-            
-            // Sync currency and class from Yahoo Finance response
-            if (!overridden && data.currency) {
-              setCcy(data.currency);
-              if (data.currency === 'THB') {
-                setCls('th');
-              } else if (data.currency === 'USD') {
-                setCls(isCrypto ? 'crypto' : 'us');
+        const fetchPriceWithFallback = async (tck) => {
+          try {
+            const res = await fetch(`/api/price?ticker=${encodeURIComponent(tck)}`, { signal: controller.signal });
+            if (res.ok) return await res.json();
+          } catch (e) {}
+          
+          try {
+            const yfUrl = `https://query1.finance.yahoo.com/v8/finance/chart/${encodeURIComponent(tck)}`;
+            const proxyUrl = `https://corsproxy.io/?${encodeURIComponent(yfUrl)}`;
+            const res = await fetch(proxyUrl, { signal: controller.signal });
+            if (res.ok) {
+              const data = await res.json();
+              const result = data.chart?.result?.[0];
+              if (result && result.meta) {
+                return {
+                  price: result.meta.regularMarketPrice,
+                  name: result.meta.shortName || result.meta.longName || tck,
+                  currency: result.meta.currency
+                };
               }
             }
-            return; // Successfully fetched, return early!
+          } catch (e) {}
+          return null;
+        };
+
+        const data = await fetchPriceWithFallback(primaryTicker);
+        if (data && data.price) {
+          setPrice(String(data.price));
+          setPriceSynced(true);
+          if (data.name) setName(data.name);
+          
+          if (!overridden && data.currency) {
+            setCcy(data.currency);
+            if (data.currency === 'THB') {
+              setCls('th');
+            } else if (data.currency === 'USD') {
+              setCls(isCrypto ? 'crypto' : 'us');
+            }
           }
+          return;
         }
         
         // If primary ticker query failed, try secondary ticker fallback
         if (secondaryTicker) {
-          const res2 = await fetch(`/api/price?ticker=${encodeURIComponent(secondaryTicker)}`, { signal: controller.signal });
-          if (res2.ok) {
-            const data2 = await res2.json();
-            if (data2.price) {
-              setPrice(String(data2.price));
-              setPriceSynced(true);
-              if (data2.name) setName(data2.name);
-              
-              if (!overridden && data2.currency) {
-                setCcy(data2.currency);
-                if (data2.currency === 'THB') {
-                  setCls('th');
-                } else if (data2.currency === 'USD') {
-                  setCls(isCrypto ? 'crypto' : 'us');
-                }
+          const data2 = await fetchPriceWithFallback(secondaryTicker);
+          if (data2 && data2.price) {
+            setPrice(String(data2.price));
+            setPriceSynced(true);
+            if (data2.name) setName(data2.name);
+            
+            if (!overridden && data2.currency) {
+              setCcy(data2.currency);
+              if (data2.currency === 'THB') {
+                setCls('th');
+              } else if (data2.currency === 'USD') {
+                setCls(isCrypto ? 'crypto' : 'us');
               }
-              return; // Add early return if successful
             }
+            return; // Add early return if successful
           }
         }
         
