@@ -1204,8 +1204,8 @@ function App() {
 
   const handleDeleteTx = async (id) => {
     if (user && window.supabaseClient) {
-      if (typeof id === 'string' && id.startsWith('tx-')) {
-        showToast(lang === 'th' ? 'กรุณารีเฟรชหน้าจอ 1 ครั้งก่อนลบรายการที่เพิ่งเพิ่มใหม่' : 'Please refresh the page before deleting this newly added transaction.');
+      if (typeof id === 'string' && (id.startsWith('tx-') || id.startsWith('temp-'))) {
+        showToast(lang === 'th' ? 'รายการกำลังซิงค์ขึ้นระบบคลาวด์ โปรดรอสักครู่...' : 'Syncing to cloud, please wait a moment before deleting.');
         return;
       }
       const { data, error } = await window.supabaseClient.from('transactions').delete().eq('id', id).select();
@@ -1240,8 +1240,8 @@ function App() {
 
     if (tx.id) {
       if (user && window.supabaseClient) {
-        if (typeof tx.id === 'string' && tx.id.startsWith('tx-')) {
-          showToast(lang === 'th' ? 'กรุณารีเฟรชหน้าจอ 1 ครั้งก่อนแก้ไขรายการที่เพิ่งเพิ่มใหม่' : 'Please refresh the page before editing this newly added transaction.');
+        if (typeof tx.id === 'string' && (tx.id.startsWith('tx-') || tx.id.startsWith('temp-'))) {
+          showToast(lang === 'th' ? 'รายการกำลังซิงค์ขึ้นระบบคลาวด์ โปรดรอสักครู่...' : 'Syncing to cloud, please wait a moment before editing.');
           return;
         }
         const { data, error } = await window.supabaseClient.from('transactions').update({
@@ -1402,7 +1402,7 @@ function App() {
     const persistAndSync = async () => {
       const supabase = window.supabaseClient;
       if (user && supabase) {
-        const { error } = await supabase
+        const { data, error } = await supabase
           .from('transactions')
           .insert({
             user_id: user.id,
@@ -1417,10 +1417,18 @@ function App() {
             fee: newTx.fee,
             ccy: newTx.ccy,
             total: newTx.total,
-          });
+          })
+          .select('id')
+          .single();
         if (error) {
           showToast(`Cloud Sync Error: ${error.message}`);
-        } else {
+        } else if (data) {
+          // Replace the temporary local ID with the real Supabase UUID
+          const idx = D_.TRANSACTIONS.findIndex(t => t.id === newTx.id);
+          if (idx !== -1) {
+            D_.TRANSACTIONS[idx].id = data.id;
+          }
+          newTx.id = data.id;
           // Notify components that data has updated
           window.dispatchEvent(new Event('netto:user-changed'));
         }
