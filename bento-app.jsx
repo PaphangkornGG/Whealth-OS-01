@@ -1103,11 +1103,10 @@ function App() {
       const activeUser = session?.user || null;
       window.AppUser = activeUser;
       setUser(activeUser);
-      if (activeUser) {
-      } else if (event === 'SIGNED_OUT') {
+      if (event === 'SIGNED_IN' || event === 'SIGNED_OUT') {
+        syncWithDbOrLocal();
+        window.dispatchEvent(new Event('netto:user-changed'));
       }
-      syncWithDbOrLocal();
-      window.dispatchEvent(new Event('netto:user-changed'));
     }) || { data: { subscription: { unsubscribe: () => {} } } };
 
     return () => subscription.unsubscribe();
