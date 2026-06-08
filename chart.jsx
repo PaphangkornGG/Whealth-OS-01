@@ -1,21 +1,48 @@
 // Performance chart — portfolio NAV over time, with cost basis + benchmark overlays.
 const { fmtTHB, fmtNum, fmtPct } = window.DataLayer;
 
-function PerformanceChart({ range, setRange }) {
+function PerformanceChart({ range: initialRange = '1M', setRange: externalSetRange }) {
   const { t, lang } = window.useT();
   const D = window.DataLayer;
+  const [range, setRange] = React.useState(initialRange);
   const [hover, setHover] = React.useState(null);
-  const [seriesOn, setSeriesOn] = React.useState({ portfolio: true, cost: true, set50: false, sp500: false });
+  const [seriesOn, setSeriesOn] = React.useState({ portfolio: true, cost: true, set50: false, sp500: false, acwi: false });
+  const [data, setData] = React.useState(null);
+  const [loading, setLoading] = React.useState(true);
 
-  const data = D.getRangeData(range);
+  React.useEffect(() => {
+    let active = true;
+    setLoading(true);
+    if (D.getRangeDataAsync) {
+      D.getRangeDataAsync(range).then(res => {
+        if (active) {
+          setData(res);
+          setLoading(false);
+        }
+      });
+    } else {
+      setData(D.getRangeData(range));
+      setLoading(false);
+    }
+    return () => { active = false; };
+  }, [range, D.TRANSACTIONS.length]);
+
+  if (loading || !data || data.days === 0) {
+    return (
+      <div className="bg-ink-50 border border-ink-200 rounded-2xl shadow-card overflow-hidden flex flex-col justify-center items-center h-[340px]">
+        <div className="w-6 h-6 border-2 border-brand border-t-transparent rounded-full animate-spin"></div>
+      </div>
+    );
+  }
+
   const n = data.portfolio.length;
 
-  // Compute min / max across visible series for chart bounds
   const visible = [];
   if (seriesOn.portfolio) visible.push(...data.portfolio);
   if (seriesOn.cost) visible.push(...data.costBasis);
   if (seriesOn.set50) visible.push(...data.set50);
   if (seriesOn.sp500) visible.push(...data.sp500);
+  if (seriesOn.acwi) visible.push(...data.acwi);
   if (!visible.length) visible.push(...data.portfolio);
   const min = Math.min(...visible);
   const max = Math.max(...visible);
@@ -23,7 +50,6 @@ function PerformanceChart({ range, setRange }) {
   const yMin = min - pad;
   const yMax = max + pad;
 
-  // Chart dimensions
   const W = 980, H = 240;
   const PADL = 56, PADR = 12, PADT = 12, PADB = 28;
   const plotW = W - PADL - PADR;
@@ -39,22 +65,12 @@ function PerformanceChart({ range, setRange }) {
     return `${pathFor(arr)} L${xAt(arr.length - 1)},${yAt(yMin)} L${xAt(0)},${yAt(yMin)} Z`;
   }
 
-  // Y axis ticks
   const yTicks = 4;
   const yTickArr = Array.from({ length: yTicks }, (_, i) => yMin + ((yMax - yMin) * (yTicks - i)) / yTicks);
 
-  // X labels — pick a few date markers based on range
   function dateLabel(i) {
-    const now = new Date(2026, 4, 27);
-    if (range === '1D') {
-      const hoursBack = (n - 1 - i);
-      const d = new Date(now);
-      d.setHours(d.getHours() - hoursBack);
-      return d.toLocaleTimeString('en-US', { hour: '2-digit', minute: '2-digit' });
-    }
-    const daysBack = (n - 1 - i);
-    const d = new Date(now);
-    d.setDate(d.getDate() - daysBack);
+    const d = data.dates && data.dates[i] ? new Date(data.dates[i]) : new Date();
+    if (range === '1D') return d.toLocaleTimeString('en-US', { hour: '2-digit', minute: '2-digit' });
     if (range === '1W') return d.toLocaleDateString('en-US', { weekday: 'short' });
     if (range === '1M' || range === '3M') return d.toLocaleDateString('en-US', { month: 'short', day: 'numeric' });
     if (range === '1Y') return d.toLocaleDateString('en-US', { month: 'short' });
@@ -64,14 +80,12 @@ function PerformanceChart({ range, setRange }) {
   const xTickCount = range === '1D' ? 4 : range === '1W' ? 7 : range === 'ALL' ? 6 : 5;
   const xTickIndices = Array.from({ length: xTickCount }, (_, i) => Math.floor((i / (xTickCount - 1)) * (n - 1)));
 
-  // Current and start values
   const startV = data.portfolio[0];
   const endV = data.portfolio[n - 1];
   const change = endV - startV;
   const changePct = (change / startV) * 100;
   const positive = change >= 0;
 
-  // Hover handler
   function onMove(e) {
     const rect = e.currentTarget.getBoundingClientRect();
     const x = ((e.clientX - rect.left) / rect.width) * W;
@@ -85,15 +99,30 @@ function PerformanceChart({ range, setRange }) {
     { id: 'cost',      label: t.costBasis, color: 'oklch(0.62 0.015 250)', dashed: true },
     { id: 'set50',     label: 'SET50',     color: 'oklch(0.78 0.16 152)' },
     { id: 'sp500',     label: 'S&P 500',   color: 'oklch(0.74 0.14 295)' },
+    { id: 'acwi',      label: 'World (ACWI)', color: 'oklch(0.82 0.15 90)' },
   ];
+
+  const RANGES = ['1W', '1M', '3M', '1Y', 'ALL'];
 
   return (
     <div className="bg-ink-50 border border-ink-200 rounded-2xl shadow-card overflow-hidden">
       <div className="flex items-start justify-between px-5 pt-5">
         <div>
-          <div className="flex items-baseline gap-3">
+          <div className="flex items-center gap-3">
             <h3 className="text-ink-700 text-sm font-semibold">{t.performance}</h3>
-            <span className="text-[11px] text-ink-500 uppercase tracking-wider">{range}</span>
+            
+            <div className="flex items-center bg-ink-100 p-0.5 rounded-lg border border-ink-200">
+              {RANGES.map(r => (
+                <button
+                  key={r}
+                  onClick={() => { setRange(r); if(externalSetRange) externalSetRange(r); }}
+                  className={`text-[10px] font-medium px-2 py-1 rounded-md transition-colors ${range === r ? 'bg-white text-ink-900 shadow-sm' : 'text-ink-500 hover:text-ink-700'}`}
+                >
+                  {r}
+                </button>
+              ))}
+            </div>
+
             <window.InfoTip title={lang === 'th' ? 'ผลตอบแทนพอร์ต' : 'Performance'}>
               {lang === 'th'
                 ? 'มูลค่าพอร์ตของคุณตามช่วงเวลา เทียบกับต้นทุนที่ลงไปและดัชนีอ้างอิง เปิด/ปิดเส้นได้ที่ปุ่มมุมขวา ชี้ที่กราฟเพื่อดูค่าแต่ละวัน'
@@ -111,14 +140,14 @@ function PerformanceChart({ range, setRange }) {
         </div>
         <div className="flex items-center gap-2">
           {/* Series toggles */}
-          <div className="hidden md:flex items-center gap-2">
+          <div className="hidden md:flex flex-wrap justify-end gap-1.5 max-w-[200px]">
             {SERIES.map(s => (
               <button
                 key={s.id}
                 onClick={() => setSeriesOn(p => ({ ...p, [s.id]: !p[s.id] }))}
-                className={`text-[11px] flex items-center gap-1.5 px-2 py-1 rounded-md border transition-colors ${seriesOn[s.id] ? 'border-ink-200 bg-ink-100 text-ink-700' : 'border-ink-200/50 bg-transparent text-ink-500 hover:text-ink-700'}`}
+                className={`text-[10px] flex items-center gap-1.5 px-1.5 py-1 rounded-md border transition-colors ${seriesOn[s.id] ? 'border-ink-200 bg-ink-100 text-ink-700' : 'border-ink-200/50 bg-transparent text-ink-500 hover:text-ink-700'}`}
               >
-                <span className={`w-2 h-2 rounded-sm transition-opacity ${seriesOn[s.id] ? 'opacity-100' : 'opacity-30'}`} style={{ background: s.color }}></span>
+                <span className={`w-1.5 h-1.5 rounded-sm transition-opacity ${seriesOn[s.id] ? 'opacity-100' : 'opacity-30'}`} style={{ background: s.color }}></span>
                 {s.label}
               </button>
             ))}
@@ -157,6 +186,10 @@ function PerformanceChart({ range, setRange }) {
           {/* S&P 500 */}
           {seriesOn.sp500 && (
             <path d={pathFor(data.sp500)} fill="none" stroke="oklch(0.74 0.14 295)" strokeWidth="1.5" opacity="0.85" />
+          )}
+          {/* ACWI */}
+          {seriesOn.acwi && (
+            <path d={pathFor(data.acwi)} fill="none" stroke="oklch(0.82 0.15 90)" strokeWidth="1.5" opacity="0.85" />
           )}
 
           {/* Portfolio (filled) */}
@@ -202,10 +235,13 @@ function PerformanceChart({ range, setRange }) {
                 <Row color="oklch(0.62 0.015 250)" label={t.costBasis} value={fmtTHB(data.costBasis[hover])}/>
               )}
               {seriesOn.set50 && (
-                <Row color="oklch(0.78 0.16 152)" label="SET50" value={fmtTHB(data.set50[hover], { compact: true })}/>
+                <Row color="oklch(0.78 0.16 152)" label="SET50" value={fmtNum(data.set50Raw[hover], 2)}/>
               )}
               {seriesOn.sp500 && (
-                <Row color="oklch(0.74 0.14 295)" label="S&P 500" value={fmtTHB(data.sp500[hover], { compact: true })}/>
+                <Row color="oklch(0.74 0.14 295)" label="S&P 500" value={fmtNum(data.sp500Raw[hover], 2)}/>
+              )}
+              {seriesOn.acwi && (
+                <Row color="oklch(0.82 0.15 90)" label="ACWI" value={fmtNum(data.acwiRaw[hover], 2)}/>
               )}
             </div>
           </div>

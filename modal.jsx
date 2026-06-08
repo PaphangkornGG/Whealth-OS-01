@@ -22,36 +22,13 @@ const COMMON_THAI_TICKERS = [
 function getLivePrice(tickerInput) {
   if (!tickerInput) return null;
   const upper = tickerInput.toUpperCase().trim();
-  const found = ENRICHED.find(a => a.ticker === upper || a.ticker.startsWith(upper + '-'));
+  const ENRICHED = window.DataLayer?.ENRICHED || [];
+  const found = ENRICHED.find(a => {
+    if (!a || !a.ticker) return false;
+    return a.ticker === upper || a.ticker.startsWith(upper + '-');
+  });
   if (found) return { price: found.price, ccy: found.ccy, name: found.name, broker: found.broker, cls: found.cls };
-  // Fallback: synthesized market prices for common Thai-investor tickers
-  // (mock — gives the demo live behaviour for tickers not currently held)
-  const fallback = {
-    // US
-    'TSLA':  { price: 348.20, ccy: 'USD' },
-    'MSFT':  { price: 428.50, ccy: 'USD' },
-    'AMZN':  { price: 195.40, ccy: 'USD' },
-    'META':  { price: 588.10, ccy: 'USD' },
-    'AMD':   { price: 162.80, ccy: 'USD' },
-    'SPY':   { price: 568.20, ccy: 'USD' },
-    'QQQ':   { price: 495.30, ccy: 'USD' },
-    'VOO':   { price: 521.40, ccy: 'USD' },
-    'VTI':   { price: 282.10, ccy: 'USD' },
-    // Thai stocks
-    'AOT':    { price: 64.25,  ccy: 'THB' },
-    'KBANK':  { price: 152.50, ccy: 'THB' },
-    'SCB':    { price: 110.00, ccy: 'THB' },
-    'BBL':    { price: 158.50, ccy: 'THB' },
-    'ADVANC': { price: 287.00, ccy: 'THB' },
-    // Thai mutual funds (NAV) are now fetched live via SEC API
-    // Crypto
-    'SOL':  { price: 168.40, ccy: 'USD', broker: 'bitkub' },
-    'BNB':  { price: 632.20, ccy: 'USD', broker: 'binance_th' },
-    'XRP':  { price: 2.42,   ccy: 'USD', broker: 'bitkub' },
-    'ADA':  { price: 0.864,  ccy: 'USD', broker: 'bitkub' },
-    'DOGE': { price: 0.385,  ccy: 'USD', broker: 'bitazza' },
-  };
-  return fallback[upper] || null;
+  return null;
 }
 
 const TX_TYPES_BASE = [
@@ -266,7 +243,7 @@ function QuickTxModal({ open, onClose, onSave, initialData = null, prefill = nul
     if (!overridden) {
       const isCrypto = ['BTC','ETH','SOL','BNB','XRP','ADA','DOGE'].includes(upper);
       const isThai = COMMON_THAI_TICKERS.includes(upper);
-      const isFund = upper.includes('-') || upper.includes('&') || upper.startsWith('SCB') || upper.startsWith('K-') || upper.startsWith('KF') || upper.startsWith('KT') || upper.startsWith('TMB') || upper.startsWith('ONE') || upper.startsWith('ASP');
+      const isFund = upper.includes('-') || upper.includes('&') || (upper.startsWith('SCB') && upper !== 'SCB') || upper.startsWith('K-') || upper.startsWith('KF') || upper.startsWith('KT') || upper.startsWith('TMB') || upper.startsWith('ONE') || upper.startsWith('ASP');
       
       if (isCrypto) {
         setCcy('USD');
@@ -324,47 +301,74 @@ function QuickTxModal({ open, onClose, onSave, initialData = null, prefill = nul
           secondaryTicker = `${upper}.BK`; // Fallback to Thai stock if US fetch fails (handles general short codes)
         }
 
-        const res = await fetch(`/api/price?ticker=${encodeURIComponent(primaryTicker)}`, { signal: controller.signal });
-        if (res.ok) {
-          const data = await res.json();
-          if (data.price) {
-            setPrice(String(data.price));
-            setPriceSynced(true);
-            if (data.name) setName(data.name);
-            
-            // Sync currency and class from Yahoo Finance response
-            if (!overridden && data.currency) {
-              setCcy(data.currency);
-              if (data.currency === 'THB') {
-                setCls('th');
-              } else if (data.currency === 'USD') {
-                setCls(isCrypto ? 'crypto' : 'us');
+        const fetchPriceWithFallback = async (tck) => {
+          const formatYfTicker = (t) => {
+            if (t === 'BRK.B') return 'BRK-B';
+            if (t === 'BRK.A') return 'BRK-A';
+            if (t === 'BF.B') return 'BF-B';
+            if (t === 'BF.A') return 'BF-A';
+            return t;
+          };
+          const yfTck = formatYfTicker(tck);
+
+          try {
+            const res = await fetch(`/api/price?ticker=${encodeURIComponent(yfTck)}`, { signal: controller.signal });
+            if (res.ok) return await res.json();
+          } catch (e) {}
+          
+          try {
+            const yfUrl = `https://query1.finance.yahoo.com/v8/finance/chart/${encodeURIComponent(yfTck)}`;
+            const proxyUrl = `https://corsproxy.io/?${encodeURIComponent(yfUrl)}`;
+            const res = await fetch(proxyUrl, { signal: controller.signal });
+            if (res.ok) {
+              const data = await res.json();
+              const result = data.chart?.result?.[0];
+              if (result && result.meta) {
+                return {
+                  price: result.meta.regularMarketPrice,
+                  name: result.meta.shortName || result.meta.longName || tck,
+                  currency: result.meta.currency
+                };
               }
             }
-            return; // Successfully fetched, return early!
+          } catch (e) {}
+          return null;
+        };
+
+        const data = await fetchPriceWithFallback(primaryTicker);
+        if (data && data.price) {
+          setPrice(String(data.price));
+          setPriceSynced(true);
+          if (data.name) setName(data.name);
+          
+          if (!overridden && data.currency) {
+            setCcy(data.currency);
+            if (data.currency === 'THB') {
+              setCls('th');
+            } else if (data.currency === 'USD') {
+              setCls(isCrypto ? 'crypto' : 'us');
+            }
           }
+          return;
         }
         
         // If primary ticker query failed, try secondary ticker fallback
         if (secondaryTicker) {
-          const res2 = await fetch(`/api/price?ticker=${encodeURIComponent(secondaryTicker)}`, { signal: controller.signal });
-          if (res2.ok) {
-            const data2 = await res2.json();
-            if (data2.price) {
-              setPrice(String(data2.price));
-              setPriceSynced(true);
-              if (data2.name) setName(data2.name);
-              
-              if (!overridden && data2.currency) {
-                setCcy(data2.currency);
-                if (data2.currency === 'THB') {
-                  setCls('th');
-                } else if (data2.currency === 'USD') {
-                  setCls(isCrypto ? 'crypto' : 'us');
-                }
+          const data2 = await fetchPriceWithFallback(secondaryTicker);
+          if (data2 && data2.price) {
+            setPrice(String(data2.price));
+            setPriceSynced(true);
+            if (data2.name) setName(data2.name);
+            
+            if (!overridden && data2.currency) {
+              setCcy(data2.currency);
+              if (data2.currency === 'THB') {
+                setCls('th');
+              } else if (data2.currency === 'USD') {
+                setCls(isCrypto ? 'crypto' : 'us');
               }
-              return; // Add early return if successful
             }
+            return; // Add early return if successful
           }
         }
         
@@ -470,9 +474,31 @@ function QuickTxModal({ open, onClose, onSave, initialData = null, prefill = nul
                   : 0);
   const grossDividendN = netDividendN + whtN;
   const effectiveWhtRate = grossDividendN > 0 ? (whtN / grossDividendN) : 0;
+  // Merge user's actual portfolio with default suggestions
+  const dynamicSuggestions = React.useMemo(() => {
+    const userAssets = window.DataLayer?.ENRICHED || [];
+    const userSuggestions = userAssets.map(a => ({ 
+      t: a.ticker || 'UNKNOWN', 
+      n: a.name || a.ticker || 'Unknown Asset', 
+      cls: a.cls || '' 
+    }));
+    
+    // Deduplicate against defaults
+    const combined = [...userSuggestions];
+    for (const def of TICKER_SUGGESTIONS) {
+      if (!combined.find(s => s.t === def.t)) {
+        combined.push(def);
+      }
+    }
+    return combined;
+  }, []);
+
   const suggestions = ticker
-    ? TICKER_SUGGESTIONS.filter(s => s.t.toLowerCase().includes(ticker.toLowerCase()) || s.n.toLowerCase().includes(ticker.toLowerCase()))
-    : TICKER_SUGGESTIONS.slice(0, 6);
+    ? dynamicSuggestions.filter(s => 
+        (s.t || '').toLowerCase().includes((ticker || '').toLowerCase()) || 
+        (s.n || '').toLowerCase().includes((ticker || '').toLowerCase())
+      )
+    : dynamicSuggestions.slice(0, 8);
 
   function handleClassChange(newCls) {
     setCls(newCls);
@@ -494,7 +520,7 @@ function QuickTxModal({ open, onClose, onSave, initialData = null, prefill = nul
     if (!livePrice) return;
     setPrice(String(livePrice.price));
     setPriceSynced(true);
-    if (livePrice.name) setName(livePrice.name);
+    if (livePrice.name || livePrice.ticker) setName(livePrice.name || livePrice.ticker || '');
     // If broker is empty and the held position has one, pre-fill that too
     if (!broker && livePrice.broker) setBroker(livePrice.broker);
   }
@@ -558,7 +584,7 @@ function QuickTxModal({ open, onClose, onSave, initialData = null, prefill = nul
 
   return (
     <div className="fixed inset-0 z-50 fade-in" role="dialog" aria-modal="true">
-      <div className="absolute inset-0 bg-ink-0/70 backdrop-blur-sm" onClick={onClose}></div>
+      <div className="absolute inset-0 bg-ink-900/50 transition-opacity" onClick={onClose}></div>
 
       <div className="relative h-full flex items-start justify-center pt-[6vh] px-4 overflow-y-auto scroll-thin">
         <div className="w-full max-w-[460px] bg-ink-50 border border-ink-300 rounded-2xl shadow-pop scale-in overflow-hidden mb-10">

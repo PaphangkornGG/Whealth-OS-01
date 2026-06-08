@@ -23,6 +23,7 @@ const COLUMNS_BASE = [
 ];
 
 function AssetTable({ externalFilter, onClearFilter }) {
+  const lang = window.localStorage.getItem('wealthos_lang') || 'en';
   const { t } = window.useT();
   const nav = window.useNav();
   const COLUMNS = COLUMNS_BASE.map(c => ({ ...c, label: t.columns[c.tkey] }));
@@ -144,7 +145,26 @@ function AssetTable({ externalFilter, onClearFilter }) {
               ))}
             </div>
           )}
-          <button className="text-ink-500 hover:text-ink-700 transition-colors p-1.5 rounded-md hover:bg-ink-100" title="Export CSV">
+          <button 
+            onClick={() => {
+              const headers = ['Date', 'Type', 'Asset', 'Broker', 'Units', 'Price', 'Fee', 'Total', 'Currency'];
+              const csv = [headers.join(',')];
+              D.TRANSACTIONS.forEach(tx => {
+                const date = tx.date.toISOString().split('T')[0];
+                csv.push([date, tx.type, tx.ticker, tx.broker, tx.units || '', tx.price || '', tx.fee || '', tx.total || '', tx.ccy].join(','));
+              });
+              const blob = new Blob([csv.join('\n')], { type: 'text/csv' });
+              const url = URL.createObjectURL(blob);
+              const a = document.createElement('a');
+              a.href = url;
+              a.download = `transactions_ledger_${new Date().toISOString().split('T')[0]}.csv`;
+              document.body.appendChild(a);
+              a.click();
+              document.body.removeChild(a);
+            }}
+            className="text-ink-500 hover:text-ink-700 transition-colors p-1.5 rounded-md hover:bg-ink-100" 
+            title={lang === 'th' ? 'ส่งออก CSV' : 'Export CSV'}
+          >
             <Icon.Download size={14}/>
           </button>
         </div>
@@ -178,7 +198,7 @@ function AssetTable({ externalFilter, onClearFilter }) {
               const cls = ASSET_CLASSES[a.cls] || { color: 'oklch(0.62 0.015 250)', label: a.cls || 'Other' };
               const sparkUp = a.spark && a.spark.length > 0 ? a.spark[a.spark.length-1] >= a.spark[0] : true;
               return (
-                <React.Fragment key={a.ticker}>
+                <React.Fragment key={`${a.ticker}-${a.broker}-${i}`}>
                   <tr
                     onClick={() => setSelected(isSel ? null : a.ticker)}
                     className={`border-t border-ink-200 cursor-pointer transition-colors ${isSel ? 'bg-ink-100' : 'hover:bg-ink-100/60'}`}
@@ -212,8 +232,30 @@ function AssetTable({ externalFilter, onClearFilter }) {
                       {a.cls === 'cash' ? '—' : `${a.ccy === 'USD' ? '$' : '฿'}${fmtNum(a.avgCost, a.avgCost < 10 ? 4 : 2)}`}
                     </td>
                     {/* Price */}
-                    <td className="px-4 py-3 text-right num text-ink-700">
-                      {a.cls === 'cash' ? '—' : `${a.ccy === 'USD' ? '$' : '฿'}${fmtNum(a.price, a.price < 10 ? 4 : 2)}`}
+                    <td className="px-4 py-3 text-right">
+                      <div className="font-semibold text-ink-900 group">
+                        <button 
+                          onClick={(e) => {
+                            e.stopPropagation();
+                            const raw = prompt(`Enter manual price for ${a.ticker}:`, a.price);
+                            if (raw !== null) {
+                              const num = parseFloat(raw);
+                              if (!isNaN(num) && num >= 0) {
+                                try {
+                                  const manual = JSON.parse(localStorage.getItem('netto:manualPrices') || '{}');
+                                  manual[a.ticker] = num;
+                                  localStorage.setItem('netto:manualPrices', JSON.stringify(manual));
+                                  window.location.reload();
+                                } catch(e) {}
+                              }
+                            }
+                          }}
+                          className="hover:bg-line px-1 -mx-1 rounded transition-colors cursor-text"
+                          title={lang === 'th' ? 'คลิกเพื่อแก้ไขราคาเอง' : 'Click to override price'}
+                        >
+                          {a.cls === 'cash' ? '—' : `${a.ccy === 'USD' ? '$' : '฿'}${fmtNum(a.price, a.price < 10 ? 4 : 2)}`}
+                        </button>
+                      </div>
                     </td>
                     {/* Spark */}
                     <td className="px-4 py-3">
@@ -293,8 +335,10 @@ function AssetTable({ externalFilter, onClearFilter }) {
         <span>{t.showingX(rows.length, ENRICHED.length)}</span>
         <div className="flex items-center gap-6 num">
           <span>{t.totalCost} <span className="text-ink-700">{fmtTHB(window.DataLayer.TOTAL_COST_THB)}</span></span>
-          <span>{t.totalValue} <span className="text-ink-700">{fmtTHB(window.DataLayer.TOTAL_THB)}</span></span>
-          <span>{t.PL} <span className="text-gain">{fmtTHB(window.DataLayer.TOTAL_THB - window.DataLayer.TOTAL_COST_THB, { sign: true })}</span></span>
+          <div className="flex items-center gap-4 text-xs font-medium text-ink-700 bg-ink-100/50 px-3 py-2 rounded">
+            <span>{t.totalVal}: {fmtTHB(window.DataLayer.TOTAL_THB)}</span>
+            <span>{t.PL} <span className={window.DataLayer.TOTAL_THB - window.DataLayer.TOTAL_COST_THB >= 0 ? 'text-gain' : 'text-loss'}>{fmtTHB(window.DataLayer.TOTAL_THB - window.DataLayer.TOTAL_COST_THB, { sign: true })}</span></span>
+          </div>
         </div>
       </div>
     </div>

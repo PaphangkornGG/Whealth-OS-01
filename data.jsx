@@ -228,6 +228,21 @@ const PORTFOLIO_SPARK = (() => {
 function recomputeDerived() {
   const D = window.DataLayer || {};
   window.DataLayer.sparkSeries = sparkSeries;
+  
+  try {
+    const manual = JSON.parse(localStorage.getItem('netto:manualPrices') || '{}');
+    if (D.ENRICHED) {
+      D.ENRICHED.forEach(a => {
+        if (manual[a.ticker] !== undefined) {
+          a.price = manual[a.ticker];
+          a.value = (a.units || 0) * a.price;
+          a.valueTHB = D.toTHB(a.value, a.ccy);
+          a.unrealized = a.value - (a.cost || 0);
+          a.unrealizedPct = a.cost > 0 ? (a.unrealized / a.cost) * 100 : 0;
+        }
+      });
+    }
+  } catch(e) {}
   D.TOTAL_THB = D.ENRICHED.reduce((s, a) => s + (a.valueTHB || 0), 0);
   D.TOTAL_COST_THB = D.ENRICHED.reduce((s, a) => s + D.toTHB(a.cost || 0, a.ccy), 0);
   D.TOTAL_DIVS_YTD_THB = D.ENRICHED.reduce((s, a) => s + D.toTHB(a.dividendsYTD || 0, a.ccy), 0);

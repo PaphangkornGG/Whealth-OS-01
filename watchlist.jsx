@@ -309,7 +309,7 @@ function AddToWatchlistModal({ open, lang, existing, onClose, onSave }) {
 
   return (
     <div className="fixed inset-0 z-50 flex items-center justify-center p-4 fade-in" onClick={onClose}>
-      <div className="absolute inset-0 bg-ink-900/40 backdrop-blur-[2px]"></div>
+      <div className="absolute inset-0 bg-ink-900/50 transition-opacity"></div>
       <div
         className="relative w-full max-w-[420px] bg-card border border-line rounded-2xl shadow-pop scale-in"
         onClick={(e) => e.stopPropagation()}

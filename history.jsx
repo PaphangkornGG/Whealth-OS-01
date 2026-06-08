@@ -3,81 +3,200 @@
 (function() {
   const D = window.DataLayer;
 
-  // Seeded RNG for stable daily walks
-  function makeRng(seed) {
-    let s = seed;
-    return () => { s = (s * 1664525 + 1013904223) >>> 0; return (s >>> 8) / 0xffffff; };
-  }
+  async function fetchHistory(ticker, range) {
+    let yfRange = '1mo';
+    let interval = '1d';
+    if (range === '1D') { yfRange = '1d'; interval = '15m'; }
+    else if (range === '1W') { yfRange = '5d'; interval = '1h'; }
+    else if (range === '1M') { yfRange = '1mo'; interval = '1d'; }
+    else if (range === '3M') { yfRange = '3mo'; interval = '1d'; }
+    else if (range === '1Y') { yfRange = '1y'; interval = '1d'; }
+    else if (range === 'ALL') { yfRange = '2y'; interval = '1d'; } // fallback to 2y for ALL for now
 
-  function dailyWalk(seed, days, drift, volatility) {
-    const r = makeRng(seed);
-    const out = [];
-    let v = 100;
-    for (let i = 0; i < days; i++) {
-      v *= 1 + (r() - 0.5) * volatility + drift;
-      out.push(v);
+    try {
+      const res = await fetch(`/api/history?ticker=${encodeURIComponent(ticker)}&range=${yfRange}&interval=${interval}`);
+      if (!res.ok) return [];
+      const json = await res.json();
+      return json.history || [];
+    } catch {
+      return [];
     }
-    return out;
   }
 
-  const DAYS = 730; // ~2 years of data
+  D.getRangeDataAsync = async function(range) {
+    let [set50Hist, sp500Hist, acwiHist] = await Promise.all([
+      fetchHistory('^SET.BK', range),
+      fetchHistory('^GSPC', range),
+      fetchHistory('ACWI', range)
+    ]);
 
-  // Portfolio normalized walk (will be scaled to current TOTAL_THB at end)
-  const portfolioWalk = dailyWalk(2026, DAYS, 0.0012, 0.018);
-  const benchSet50    = dailyWalk(909,  DAYS, 0.0004, 0.014);
-  const benchSP500    = dailyWalk(1234, DAYS, 0.0009, 0.012);
-
-  // Helpers — get slice for a timeframe
-  // Timeframes: '1D' (last 1 day, 24 points), '1W' (7), '1M' (30), '3M' (90), '1Y' (365), 'ALL' (730)
-  const RANGES = {
-    '1D':  1,
-    '1W':  7,
-    '1M':  30,
-    '3M':  90,
-    '1Y':  365,
-    'ALL': DAYS,
-  };
-
-  function getRangeData(range) {
-    const days = RANGES[range] || 30;
-    const startIdx = Math.max(0, DAYS - days);
+    // Fallback if backend API is not available (e.g. GitHub Pages static hosting)
+    let isMocking = false;
+    let daysToMock = range === '1D' ? 30 : range === '1W' ? 7 : range === '1M' ? 30 : range === '3M' ? 90 : range === '1Y' ? 365 : 730;
     
-    // Scale portfolio so that its end value equals current TOTAL_THB dynamically
-    const scale = D.TOTAL_THB / portfolioWalk[DAYS - 1];
-    const benchScaleSet50 = D.TOTAL_THB / benchSet50[DAYS - 1];
-    const benchScaleSP500 = D.TOTAL_THB / benchSP500[DAYS - 1];
-    
-    if (range === '1D') {
-      // Generate 24 intraday points for 1D to make it a smooth line
-      const intraWalk = dailyWalk(42, 24, 0.0001, 0.005);
-      const intraScale = D.TOTAL_THB / intraWalk[23];
-      const intraSet50 = dailyWalk(101, 24, 0.00005, 0.004);
-      const intraSP500 = dailyWalk(202, 24, 0.00008, 0.004);
+    if (set50Hist.length === 0) {
+      isMocking = true;
+      const now = Date.now();
+      const intervalMs = range === '1D' ? 900000 : range === '1W' ? 3600000 : 86400000; // 15m, 1h, 1d
+      const points = range === '1D' ? 30 : range === '1W' ? 40 : daysToMock;
       
-      return {
-        portfolio: intraWalk.map(v => v * intraScale),
-        costBasis: Array(24).fill(D.TOTAL_COST_THB),
-        set50: intraSet50.map(v => v * (D.TOTAL_THB / intraSet50[23]) * 0.78),
-        sp500: intraSP500.map(v => v * (D.TOTAL_THB / intraSP500[23]) * 1.08),
-        days: 24,
+      const genMock = (seed, basePrice, slope) => {
+        const raw = D.sparkSeries(seed, points, slope);
+        const ratio = basePrice / raw[points - 1];
+        return raw.map((v, i) => ({
+          date: (now - (points - 1 - i) * intervalMs) / 1000,
+          price: v * ratio
+        }));
       };
-    }
-    
-    const costVals = [];
-    for (let i = startIdx; i < DAYS; i++) {
-      const t = i / (DAYS - 1);
-      const eased = Math.pow(t, 0.7);
-      costVals.push(eased * D.TOTAL_COST_THB);
+      
+      set50Hist = genMock(50, 1000, 0.05);
+      sp500Hist = genMock(500, 5000, 0.08);
+      acwiHist = genMock(100, 100, 0.06);
     }
 
+    const holdings = D.ENRICHED.filter(a => a.cls !== 'cash');
+    const tickerHists = {};
+    const fetchPromises = holdings.map(async (a) => {
+      let hist = isMocking ? [] : await fetchHistory(a.ticker, range);
+      if (hist.length === 0) {
+        const currentPrice = a.price || 10;
+        if (isMocking) {
+          const seed = a.ticker.charCodeAt(0) + a.ticker.charCodeAt(a.ticker.length - 1);
+          const raw = D.sparkSeries(seed, set50Hist.length, 0.05);
+          const ratio = currentPrice / raw[raw.length - 1];
+          hist = set50Hist.map((d, i) => ({
+            date: d.date,
+            price: raw[i] * ratio
+          }));
+        } else {
+          // Fallback for Thai Mutual Funds or missing data: shape it like SET50
+          const lastSet50Price = set50Hist[set50Hist.length - 1]?.price || 100;
+          hist = set50Hist.map(d => ({
+            date: d.date,
+            price: currentPrice * (d.price / lastSet50Price)
+          }));
+        }
+      }
+      tickerHists[a.ticker] = hist;
+    });
+    
+    await Promise.all(fetchPromises);
+
+    // Gather all unique timestamps to align the series
+    const timeMap = new Set();
+    set50Hist.forEach(d => timeMap.add(d.date));
+    sp500Hist.forEach(d => timeMap.add(d.date));
+    acwiHist.forEach(d => timeMap.add(d.date));
+    
+    let times = Array.from(timeMap).sort((a, b) => a - b);
+    if (times.length === 0) {
+      times = Array.from({length: 30}, (_, i) => Date.now()/1000 - (30-i)*86400);
+    }
+
+    const set50Vals = [];
+    const sp500Vals = [];
+    const acwiVals = [];
+    const costVals = [];
+    const portVals = [];
+    const dateVals = [];
+
+    let lastSet50 = set50Hist.length > 0 ? set50Hist[0].price : 100;
+    let lastSp500 = sp500Hist.length > 0 ? sp500Hist[0].price : 100;
+    let lastAcwi = acwiHist.length > 0 ? acwiHist[0].price : 100;
+
+    let set50Idx = 0;
+    let sp500Idx = 0;
+    let acwiIdx = 0;
+
+    const histCursors = {};
+    const lastPrice = {};
+    for (const a of holdings) {
+      histCursors[a.ticker] = 0;
+      lastPrice[a.ticker] = tickerHists[a.ticker]?.[0]?.price || a.price;
+    }
+
+    const txs = [...D.TRANSACTIONS].reverse();
+    let currentTxsIdx = 0;
+    const inventory = {};
+    let costAtTime = 0;
+    
+    const currentInvested = holdings.reduce((s, a) => s + a.valueTHB, 0);
+    const cashBuffer = Math.max(0, D.TOTAL_THB - currentInvested);
+
+    for (const t of times) {
+      while (set50Idx < set50Hist.length && set50Hist[set50Idx].date <= t) {
+        lastSet50 = set50Hist[set50Idx].price;
+        set50Idx++;
+      }
+      while (sp500Idx < sp500Hist.length && sp500Hist[sp500Idx].date <= t) {
+        lastSp500 = sp500Hist[sp500Idx].price;
+        sp500Idx++;
+      }
+      while (acwiIdx < acwiHist.length && acwiHist[acwiIdx].date <= t) {
+        lastAcwi = acwiHist[acwiIdx].price;
+        acwiIdx++;
+      }
+
+      for (const a of holdings) {
+        const hist = tickerHists[a.ticker];
+        while (histCursors[a.ticker] < hist.length && hist[histCursors[a.ticker]].date <= t) {
+          lastPrice[a.ticker] = hist[histCursors[a.ticker]].price;
+          histCursors[a.ticker]++;
+        }
+      }
+
+      while (currentTxsIdx < txs.length && txs[currentTxsIdx].date.getTime() / 1000 <= t) {
+        const tx = txs[currentTxsIdx];
+        if (tx.type === 'buy') {
+          inventory[tx.ticker] = (inventory[tx.ticker] || 0) + tx.units;
+          costAtTime += tx.ccy === 'USD' ? tx.total * D.FX.USD_THB : tx.total;
+        } else if (tx.type === 'sell') {
+          inventory[tx.ticker] = Math.max(0, (inventory[tx.ticker] || 0) - tx.units);
+          costAtTime -= tx.ccy === 'USD' ? tx.total * D.FX.USD_THB : tx.total;
+        }
+        currentTxsIdx++;
+      }
+      
+      let investedValueTHB = 0;
+      for (const tck of Object.keys(inventory)) {
+        const units = inventory[tck];
+        if (units > 0) {
+          const price = lastPrice[tck] || 0;
+          const a = holdings.find(x => x.ticker === tck);
+          const fx = a?.ccy === 'USD' ? D.FX.USD_THB : 1;
+          investedValueTHB += (units * price * fx);
+        }
+      }
+      
+      const portNav = investedValueTHB + cashBuffer;
+      const safeCost = Math.max(0, costAtTime) + cashBuffer;
+
+      set50Vals.push(lastSet50);
+      sp500Vals.push(lastSp500);
+      acwiVals.push(lastAcwi);
+      costVals.push(safeCost);
+      portVals.push(portNav);
+      dateVals.push(new Date(t * 1000));
+    }
+
+    const currentTotal = D.TOTAL_THB || 1;
+    const finalSet50 = set50Vals[set50Vals.length - 1] || 1;
+    const finalSp500 = sp500Vals[sp500Vals.length - 1] || 1;
+    const finalAcwi = acwiVals[acwiVals.length - 1] || 1;
+    
     return {
-      portfolio: portfolioWalk.slice(startIdx).map(v => v * scale),
+      portfolio: portVals,
       costBasis: costVals,
-      set50: benchSet50.slice(startIdx).map(v => v * benchScaleSet50 * 0.78),
-      sp500: benchSP500.slice(startIdx).map(v => v * benchScaleSP500 * 1.08),
-      days,
+      set50: set50Vals.map(v => v * (currentTotal / finalSet50)),
+      sp500: sp500Vals.map(v => v * (currentTotal / finalSp500)),
+      acwi: acwiVals.map(v => v * (currentTotal / finalAcwi)),
+      set50Raw: set50Vals,
+      sp500Raw: sp500Vals,
+      acwiRaw: acwiVals,
+      dates: dateVals,
+      days: times.length,
     };
-  }
+  };
 
   // Generate transaction ledger from holdings — simulate Buys + Dividends
   function genTransactions() {
@@ -204,8 +323,6 @@
     },
   ];
 
-  window.DataLayer.getRangeData = getRangeData;
-  window.DataLayer.RANGES = RANGES;
   window.DataLayer.TRANSACTIONS = TRANSACTIONS;
   window.DataLayer.GOALS = GOALS;
 })();

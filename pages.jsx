@@ -1400,7 +1400,21 @@ function SettingsPage() {
                 : 'Are you sure you want to delete all transaction history? This action is permanent and cannot be undone.';
               if (window.confirm(confirmMsg)) {
                 localStorage.removeItem('netto:userTxs');
-                window.location.reload();
+                if (window.supabaseClient) {
+                  window.supabaseClient.from('transactions')
+                    .delete()
+                    .neq('id', '00000000-0000-0000-0000-000000000000')
+                    .then(({ error }) => {
+                      if (error) {
+                        console.error('Failed to clear Supabase history:', error);
+                        alert(lang === 'th' ? 'ลบข้อมูลไม่สำเร็จ: ' + error.message : 'Failed to clear history: ' + error.message);
+                      } else {
+                        window.location.reload();
+                      }
+                    });
+                } else {
+                  window.location.reload();
+                }
               }
             }}
             className="px-4 py-2 bg-loss text-white text-[12px] font-semibold rounded-lg hover:bg-loss/90 transition-colors shadow-sm self-start md:self-auto cursor-pointer"

@@ -739,20 +739,50 @@ function App() {
       }
       
       try {
-        const res = await fetch(`/api/price?ticker=${encodeURIComponent(queryTicker)}`);
-        if (res.ok) {
-          const data = await res.json();
-          if (data.price) {
-            held.price = data.price;
-            if (data.prevClose) {
-              held.dayChangePct = ((data.price - data.prevClose) / data.prevClose) * 100;
+        const fetchPriceWithFallback = async (tck) => {
+          const formatYfTicker = (t) => {
+            if (t === 'BRK.B') return 'BRK-B';
+            if (t === 'BRK.A') return 'BRK-A';
+            if (t === 'BF.B') return 'BF-B';
+            if (t === 'BF.A') return 'BF-A';
+            return t;
+          };
+          const yfTck = formatYfTicker(tck);
+
+          try {
+            const res = await fetch(`/api/price?ticker=${encodeURIComponent(yfTck)}`);
+            if (res.ok) return await res.json();
+          } catch(e) {}
+          try {
+            const yfUrl = `https://query1.finance.yahoo.com/v8/finance/chart/${encodeURIComponent(yfTck)}?interval=1d`;
+            const res = await fetch(`https://corsproxy.io/?${encodeURIComponent(yfUrl)}`);
+            if (res.ok) {
+              const data = await res.json();
+              const result = data.chart?.result?.[0];
+              if (result && result.meta) {
+                return {
+                  price: result.meta.regularMarketPrice,
+                  prevClose: result.meta.chartPreviousClose || result.meta.previousClose,
+                  name: result.meta.shortName || result.meta.longName || tck,
+                  currency: result.meta.currency
+                };
+              }
             }
-            // Update sparkline with the new price as the latest point
-            if (held.spark && held.spark.length > 0) {
-              held.spark[held.spark.length - 1] = data.price;
-            }
-            updatedCount++;
+          } catch(e) {}
+          return null;
+        };
+
+        const data = await fetchPriceWithFallback(queryTicker);
+        if (data && data.price) {
+          held.price = data.price;
+          if (data.prevClose) {
+            held.dayChangePct = ((data.price - data.prevClose) / data.prevClose) * 100;
           }
+          // Update sparkline with the new price as the latest point
+          if (held.spark && held.spark.length > 0) {
+            held.spark[held.spark.length - 1] = data.price;
+          }
+          updatedCount++;
         }
       } catch (err) {
         console.error('Failed to sync', queryTicker, err);
@@ -783,16 +813,44 @@ function App() {
           if (w.cls === 'fund') continue;
           
           try {
-            const res = await fetch(`/api/price?ticker=${encodeURIComponent(queryTicker)}`);
-            if (res.ok) {
-              const data = await res.json();
-              if (data.price) {
-                w.price = data.price;
-                if (data.prevClose) {
-                  w.prev = data.prevClose; // Update previous close for change calculations
+            const fetchPriceWithFallback = async (tck) => {
+              const formatYfTicker = (t) => {
+                if (t === 'BRK.B') return 'BRK-B';
+                if (t === 'BRK.A') return 'BRK-A';
+                if (t === 'BF.B') return 'BF-B';
+                if (t === 'BF.A') return 'BF-A';
+                return t;
+              };
+              const yfTck = formatYfTicker(tck);
+
+              try {
+                const res = await fetch(`/api/price?ticker=${encodeURIComponent(yfTck)}`);
+                if (res.ok) return await res.json();
+              } catch(e) {}
+              try {
+                const yfUrl = `https://query1.finance.yahoo.com/v8/finance/chart/${encodeURIComponent(yfTck)}?interval=1d`;
+                const res = await fetch(`https://corsproxy.io/?${encodeURIComponent(yfUrl)}`);
+                if (res.ok) {
+                  const data = await res.json();
+                  const result = data.chart?.result?.[0];
+                  if (result && result.meta) {
+                    return {
+                      price: result.meta.regularMarketPrice,
+                      prevClose: result.meta.chartPreviousClose || result.meta.previousClose
+                    };
+                  }
                 }
-                watchUpdated = true;
+              } catch(e) {}
+              return null;
+            };
+
+            const data = await fetchPriceWithFallback(queryTicker);
+            if (data && data.price) {
+              w.price = data.price;
+              if (data.prevClose) {
+                w.prev = data.prevClose; // Update previous close for change calculations
               }
+              watchUpdated = true;
             }
           } catch (err) {
             console.error('Failed to sync watchlist', queryTicker, err);
@@ -1144,8 +1202,20 @@ function App() {
   }), [syncing, lastSync]);
 
   const handleDeleteTx = async (id) => {
-    if (window.supabaseClient) {
-      await window.supabaseClient.from('transactions').delete().eq('id', id);
+    if (user && window.supabaseClient) {
+      if (typeof id === 'string' && (id.startsWith('tx-') || id.startsWith('temp-'))) {
+        showToast(lang === 'th' ? 'รายการกำลังซิงค์ขึ้นระบบคลาวด์ โปรดรอสักครู่...' : 'Syncing to cloud, please wait a moment before deleting.');
+        return;
+      }
+      const { data, error } = await window.supabaseClient.from('transactions').delete().eq('id', id).select();
+      if (error) {
+        showToast(`Error deleting: ${error.message}`);
+        return;
+      }
+      if (!data || data.length === 0) {
+        showToast(lang === 'th' ? 'ลบไม่สำเร็จ (อาจไม่มีสิทธิ์หรือหารายการไม่เจอ)' : 'Delete failed (no permission or not found)');
+        return;
+      }
       window.location.reload();
     } else {
       const userTxs = JSON.parse(localStorage.getItem('netto:userTxs') || '[]');
@@ -1168,8 +1238,12 @@ function App() {
     }
 
     if (tx.id) {
-      if (window.supabaseClient) {
-        const { error } = await window.supabaseClient.from('transactions').update({
+      if (user && window.supabaseClient) {
+        if (typeof tx.id === 'string' && (tx.id.startsWith('tx-') || tx.id.startsWith('temp-'))) {
+          showToast(lang === 'th' ? 'รายการกำลังซิงค์ขึ้นระบบคลาวด์ โปรดรอสักครู่...' : 'Syncing to cloud, please wait a moment before editing.');
+          return;
+        }
+        const { data, error } = await window.supabaseClient.from('transactions').update({
           date: tx.date ? new Date(`${tx.date}T12:00:00`).toISOString() : new Date().toISOString(),
           type: tx.type,
           ticker: tickerUpper,
@@ -1181,11 +1255,14 @@ function App() {
           fee: tx.fee || 0,
           ccy: tx.ccy,
           total: tx.type === 'dividend' ? tx.amount : tx.amount * tx.price,
-        }).eq('id', tx.id);
-        if (!error) {
-          window.location.reload();
-        } else {
+        }).eq('id', tx.id).select();
+        
+        if (error) {
           showToast(`Error updating: ${error.message}`);
+        } else if (!data || data.length === 0) {
+          showToast(lang === 'th' ? 'แก้ไขไม่สำเร็จ (อาจไม่มีสิทธิ์หรือหารายการไม่เจอ)' : 'Update failed (no permission or not found)');
+        } else {
+          window.location.reload();
         }
       } else {
         const userTxs = JSON.parse(localStorage.getItem('netto:userTxs') || '[]');
@@ -1231,13 +1308,13 @@ function App() {
           : 'th');
     const newTx = {
       // Temporary ID for UI rendering. Sync re-populates proper UUID.
-      id: `temp-${Date.now()}`,
+      id: `temp-${Date.now()}-${Math.random().toString(36).substring(2, 7)}`,
       // tx.date is a YYYY-MM-DD string from the modal's <input type="date">.
       // Anchor it to local noon so the date doesn't shift across timezones.
       date: tx.date ? new Date(`${tx.date}T12:00:00`) : new Date(),
       type: tx.type,
       ticker: tickerUpper,
-      name: held?.name || tickerUpper,
+      name: tx.name || held?.name || tickerUpper,
       cls,
       broker: brokerId,
       amount: tx.type === 'dividend' ? null : tx.amount,
@@ -1247,14 +1324,16 @@ function App() {
       ccy,
       total: tx.type === 'dividend' ? tx.amount : tx.amount * tx.price,
     };
-    D_.TRANSACTIONS.unshift(newTx);
+    if (!D_.TRANSACTIONS.find(t => t.id === newTx.id)) {
+      D_.TRANSACTIONS.unshift(newTx);
+    }
 
     // 2) Mutate the matching ENRICHED position so portfolio totals update.
     //    On a BUY into a new (ticker, broker) lot, create a fresh position.
     if (!held && tx.type === 'buy' && brokerId) {
       held = {
         ticker: tickerUpper,
-        name: sibling?.name || tickerUpper,
+        name: tx.name || sibling?.name || tickerUpper,
         cls,
         ccy,
         broker: brokerId,
@@ -1322,7 +1401,7 @@ function App() {
     const persistAndSync = async () => {
       const supabase = window.supabaseClient;
       if (user && supabase) {
-        const { error } = await supabase
+        const { data, error } = await supabase
           .from('transactions')
           .insert({
             user_id: user.id,
@@ -1337,10 +1416,18 @@ function App() {
             fee: newTx.fee,
             ccy: newTx.ccy,
             total: newTx.total,
-          });
+          })
+          .select('id')
+          .single();
         if (error) {
           showToast(`Cloud Sync Error: ${error.message}`);
-        } else {
+        } else if (data) {
+          // Replace the temporary local ID with the real Supabase UUID
+          const idx = D_.TRANSACTIONS.findIndex(t => t.id === newTx.id);
+          if (idx !== -1) {
+            D_.TRANSACTIONS[idx].id = data.id;
+          }
+          newTx.id = data.id;
           // Notify components that data has updated
           window.dispatchEvent(new Event('netto:user-changed'));
         }
@@ -1380,42 +1467,86 @@ function App() {
   return (
     <LangProvider>
       <NavContext.Provider value={navValue}>
-        <div className="max-w-[1440px] mx-auto">
-          <TopNav page={page} setPage={setPage}/>
+        <div className="wealthos-app" translate="no">
+          <div className="max-w-[1440px] mx-auto">
+            <TopNav page={page} setPage={setPage}/>
 
-          <div key={`${page}-${refreshKey}`} className="fade-in space-y-4">
-            {page === 'overview' && <OverviewPage/>}
-            {page === 'holdings' && <window.HoldingsPage/>}
-            {page === 'cashflow' && <window.CashflowPage/>}
-            {page === 'goals'    && <window.GoalsPage/>}
-            {page === 'settings' && <window.SettingsPage/>}
+            <div key={page} className="fade-in space-y-4">
+              {page === 'overview' && <OverviewPage/>}
+              {page === 'holdings' && <window.HoldingsPage/>}
+              {page === 'cashflow' && <window.CashflowPage/>}
+              {page === 'goals'    && <window.GoalsPage/>}
+              {page === 'settings' && <window.SettingsPage/>}
+            </div>
+
+            <div className="mt-6 flex items-center justify-between text-[11px] text-ink-500 px-2">
+              <div className="flex items-center gap-3">
+                <span>Wealth OS · v0.6</span>
+                <button 
+                  onClick={syncPrices} 
+                  disabled={syncing}
+                  className={`flex items-center gap-1.5 px-2 py-1 rounded border border-line bg-card hover:bg-surface-soft active:scale-[0.98] transition-all text-ink-700 font-semibold cursor-pointer ${syncing ? 'opacity-50 cursor-not-allowed' : ''}`}
+                >
+                  <span className={`w-1.5 h-1.5 rounded-full ${syncing ? 'bg-warn animate-pulse' : 'bg-gain'}`}></span>
+                  {syncing ? 'Syncing...' : `Synced: ${lastSync}`}
+                </button>
+              </div>
+              <div className="flex items-center gap-3">
+                <span>Prices: Live (Yahoo Finance)</span>
+                <span>FX: ฿{window.DataLayer.FX.USD_THB.toFixed(2)} / USD</span>
+              </div>
+            </div>
           </div>
 
-          <div className="mt-6 flex items-center justify-between text-[11px] text-ink-500 px-2">
-            <div className="flex items-center gap-3">
-              <span>Wealth OS · v0.6</span>
-              <button 
-                onClick={syncPrices} 
-                disabled={syncing}
-                className={`flex items-center gap-1.5 px-2 py-1 rounded border border-line bg-card hover:bg-surface-soft active:scale-[0.98] transition-all text-ink-700 font-semibold cursor-pointer ${syncing ? 'opacity-50 cursor-not-allowed' : ''}`}
-              >
-                <span className={`w-1.5 h-1.5 rounded-full ${syncing ? 'bg-warn animate-pulse' : 'bg-gain'}`}></span>
-                {syncing ? 'Syncing...' : `Synced: ${lastSync}`}
-              </button>
-            </div>
-            <div className="flex items-center gap-3">
-              <span>Prices: Live (Yahoo Finance)</span>
-              <span>FX: ฿{window.DataLayer.FX.USD_THB.toFixed(2)} / USD</span>
-            </div>
+          <div className="modals-container">
+            {modalOpen && (
+              <window.QuickTxModal 
+                open={true} 
+                onClose={() => { setModalOpen(false); setModalPrefill(null); setEditTx(null); }} 
+                onSave={handleSave} 
+                prefill={modalPrefill} 
+                initialData={editTx}
+              />
+            )}
+            {ledgerOpen && (
+              <window.TransactionLedger 
+                open={true} 
+                onClose={() => setLedgerOpen(false)} 
+                onEditTx={(tx) => { setEditTx(tx); setModalOpen(true); setLedgerOpen(false); }} 
+                onDeleteTx={handleDeleteTx}
+              />
+            )}
           </div>
+          <Toast show={!!toast}>{toast}</Toast>
         </div>
-
-        <window.QuickTxModal open={modalOpen} onClose={() => { setModalOpen(false); setModalPrefill(null); setEditTx(null); }} onSave={handleSave} prefill={modalPrefill} initialData={editTx}/>
-        <window.TransactionLedger open={ledgerOpen} onClose={() => setLedgerOpen(false)} onEditTx={(tx) => { setEditTx(tx); setModalOpen(true); setLedgerOpen(false); }} onDeleteTx={handleDeleteTx}/>
-        <Toast show={!!toast}>{toast}</Toast>
       </NavContext.Provider>
     </LangProvider>
   );
 }
+class ErrorBoundary extends React.Component {
+  constructor(props) {
+    super(props);
+    this.state = { hasError: false, error: null, info: null };
+  }
+  static getDerivedStateFromError(error) {
+    return { hasError: true, error };
+  }
+  componentDidCatch(error, info) {
+    console.error('ErrorBoundary caught error:', error, info);
+    this.setState({ info });
+  }
+  render() {
+    if (this.state.hasError) {
+      return (
+        <div className="p-8 text-red-500 bg-red-50 min-h-screen">
+          <h1 className="text-xl font-bold mb-4">React Render Error</h1>
+          <pre className="whitespace-pre-wrap font-mono text-xs">{this.state.error?.stack || this.state.error?.toString()}</pre>
+          <pre className="whitespace-pre-wrap font-mono text-xs mt-4 opacity-70">{this.state.info?.componentStack}</pre>
+        </div>
+      );
+    }
+    return this.props.children;
+  }
+}
 
-ReactDOM.createRoot(document.getElementById('root')).render(<App />);
+ReactDOM.createRoot(document.getElementById('root')).render(<ErrorBoundary><App /></ErrorBoundary>);

@@ -7,12 +7,29 @@ const { Card, Pill, MoneyBig, ChangeBadge } = window.Bento;
 function GoalsBento() {
   const { t, lang } = window.useT();
   const nav = window.useNav();
-  const [focused, setFocused] = React.useState(D2.GOALS[0]?.id);
-  const main = D2.GOALS.find(g => g.id === focused) || D2.GOALS[0];
-  const others = D2.GOALS.filter(g => g.id !== focused);
+  const { goals } = window.useGoals();
+  const [focused, setFocused] = React.useState(null);
+
+  if (!goals || goals.length === 0) {
+    return (
+      <Card padding="p-5" className="h-[432px] flex flex-col items-center justify-center text-center">
+        <div className="w-12 h-12 rounded-full bg-surface-soft border border-line flex items-center justify-center text-ink-400 mb-3">
+          <I2.Target size={24}/>
+        </div>
+        <h4 className="text-ink-900 font-semibold mb-1">{lang === 'th' ? 'ไม่มีเป้าหมาย' : 'No goals yet'}</h4>
+        <p className="text-[13px] text-ink-500 mb-4">{lang === 'th' ? 'สร้างเป้าหมายการลงทุนของคุณ' : 'Create your first goal to start tracking progress'}</p>
+        <button onClick={() => nav.goTo('goals')} className="px-4 py-2 bg-ink-900 text-white rounded-xl font-medium text-[13px] hover:bg-ink-800 transition-colors">
+          + {lang === 'th' ? 'เป้าหมายใหม่' : 'New goal'}
+        </button>
+      </Card>
+    );
+  }
+
+  const main = goals.find(g => g.id === focused) || goals[0];
+  const others = goals.filter(g => g.id !== main.id);
   const cycleNext = () => {
-    const idx = D2.GOALS.findIndex(g => g.id === focused);
-    const next = D2.GOALS[(idx + 1) % D2.GOALS.length];
+    const idx = goals.findIndex(g => g.id === main.id);
+    const next = goals[(idx + 1) % goals.length];
     setFocused(next.id);
   };
 
@@ -500,9 +517,10 @@ function TodayReceivedCard() {
           </span>
         </div>
         {top && (
-          <div className="mt-2 flex items-center gap-1.5 text-[11px] text-ink-500">
-            <span className="w-1.5 h-1.5 rounded-full shrink-0" style={{ background: D.ASSET_CLASSES[top.cls]?.color }}></span>
-            <span className="num font-medium text-ink-700">{top.ticker}</span>
+          <div className="flex items-center gap-1.5 min-w-0 mt-2">
+            {window.StockLogo && <window.StockLogo ticker={top.ticker} cls={top.cls} size={16} showFallbackBorder={false} />}
+            {!window.StockLogo && <span className="w-1.5 h-1.5 rounded-full shrink-0" style={{ background: D.ASSET_CLASSES[top.cls]?.color }}></span>}
+            <span className="text-[12px] font-medium text-ink-800 truncate">{top.ticker.replace('-THB','')}</span>
             <span>{lang === 'th' ? 'นำกลุ่ม' : 'leads'}</span>
             <span className="num text-ink-700">{D.fmtTHB(top.value, { compact: true })}</span>
           </div>
@@ -600,12 +618,29 @@ function TransactionsBento() {
             />
           </div>
           <button
-            title={lang === 'th' ? 'ตัวกรอง' : 'Filters'}
+            onClick={() => nav.openLedger()}
+            title={lang === 'th' ? 'เปิดสมุดบัญชีแบบเต็ม' : 'Open Full Ledger'}
             className="w-8 h-8 rounded-full bg-surface-soft border border-line flex items-center justify-center text-ink-700 hover:bg-line hover:text-ink-900 cursor-pointer transition-colors"
           >
             <I2.Sliders size={12}/>
           </button>
           <button
+            onClick={() => {
+              const headers = ['Date', 'Type', 'Asset', 'Broker', 'Units', 'Price', 'Fee', 'Total', 'Currency'];
+              const csv = [headers.join(',')];
+              D2.TRANSACTIONS.forEach(tx => {
+                const date = tx.date.toISOString().split('T')[0];
+                csv.push([date, tx.type, tx.ticker, tx.broker, tx.units || '', tx.price || '', tx.fee || '', tx.total || '', tx.ccy].join(','));
+              });
+              const blob = new Blob([csv.join('\n')], { type: 'text/csv' });
+              const url = URL.createObjectURL(blob);
+              const a = document.createElement('a');
+              a.href = url;
+              a.download = `transactions_${new Date().toISOString().split('T')[0]}.csv`;
+              document.body.appendChild(a);
+              a.click();
+              document.body.removeChild(a);
+            }}
             title={lang === 'th' ? 'ดาวน์โหลด CSV' : 'Download CSV'}
             className="w-8 h-8 rounded-full bg-surface-soft border border-line flex items-center justify-center text-ink-700 hover:bg-line hover:text-ink-900 cursor-pointer transition-colors"
           >
@@ -627,7 +662,7 @@ function TransactionsBento() {
             </tr>
           </thead>
           <tbody>
-            {rows.map(tx => {
+            {rows.map((tx, i) => {
               const cls = D2.ASSET_CLASSES[tx.cls] || { color: 'oklch(0.62 0.015 250)', label: tx.cls || 'Other' };
               const broker = D2.BROKERS[tx.broker];
               const status = STATUS_TONES[tx.type] || { label: tx.type || 'Unknown', cls: 'bg-ink-300 text-ink-800' };
@@ -650,7 +685,7 @@ function TransactionsBento() {
               }
               const isPositive = tx.type === 'buy' || tx.type === 'dividend';
               return (
-                <tr key={tx.id} className="border-t border-line hover:bg-surface-soft transition-colors">
+                <tr key={`${tx.id}-${i}`} className="border-t border-line hover:bg-surface-soft transition-colors">
                   <td className="px-5 py-3">
                     <div className="flex items-center gap-2.5">
                       <StockLogo ticker={tx.ticker} cls={tx.cls} size={28} />

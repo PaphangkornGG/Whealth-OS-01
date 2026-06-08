@@ -93,7 +93,10 @@
 </head>
 <body class="min-h-screen p-4 md:p-6">
   <div id="root"></div>
-
+  <script>
+    // Removed aggressive window.onerror that was destroying the React root and causing secondary NotFoundErrors.
+    // We now rely on the React ErrorBoundary inside bento-app.jsx to catch and display real render errors.
+  </script>
   <script src="https://unpkg.com/@supabase/supabase-js@2"></script>
   <script type="text/babel" src="supabase.jsx?v=2"></script>
   <script type="text/babel" src="sec-api.jsx?v=3"></script>

@@ -17,7 +17,7 @@ function TopBar({ page, setPage }) {
     { id: 'settings', label: t.nav.settings },
   ];
   return (
-    <header className="sticky top-0 z-30 bg-ink-0/80 backdrop-blur-md border-b border-ink-200">
+    <header className="sticky top-0 z-30 bg-ink-0 border-b border-ink-200">
       <div className="max-w-[1440px] mx-auto px-6 h-[60px] flex items-center justify-between">
         <div className="flex items-center gap-8">
           <button onClick={() => setPage('overview')} className="flex items-center gap-2.5">
@@ -216,7 +216,7 @@ function SearchPalette({ open, onClose, setPage }) {
 
   return (
     <div className="fixed inset-0 z-50 fade-in">
-      <div className="absolute inset-0 bg-ink-0/70 backdrop-blur-sm" onClick={onClose}></div>
+      <div className="absolute inset-0 bg-ink-900/50 transition-opacity" onClick={onClose}></div>
       <div className="relative max-w-[520px] mx-auto mt-[12vh] bg-ink-50 border border-ink-300 rounded-2xl shadow-pop scale-in overflow-hidden">
         <div className="px-4 py-3 border-b border-ink-200 flex items-center gap-2">
           <Icon.Search size={14} className="text-ink-500"/>
