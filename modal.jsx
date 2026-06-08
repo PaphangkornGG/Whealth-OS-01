@@ -220,7 +220,7 @@ function QuickTxModal({ open, onClose, onSave, initialData = null, prefill = nul
 
   // Debounced auto-fetch for stock/crypto price and company name when ticker is entered
   React.useEffect(() => {
-    if (!open || !ticker || ticker.length < 2) return;
+    if (!open || !ticker || ticker.length < 1) return;
     
     const upper = ticker.toUpperCase().trim();
     
