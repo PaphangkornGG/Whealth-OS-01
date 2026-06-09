@@ -52,9 +52,11 @@ class SecApi {
     const ALIAS_MAPPING = {
       'SCBS&P500E': 'M0643_2555',
       'SCBS&P500A': 'M0643_2555',
-      'SCBS&P500': 'M0643_2555',
-      'SCBGOLDH': 'M0502_2554',
-      'SCBPGF': 'M0101_2557'
+      'SCBS&P500':  'M0643_2555',
+      'SCBGOLDH':   'M0502_2554',
+      'SCBPGF':     'M0101_2557',
+      // KKP funds: SEC stores them as "KKP S-PLUS FUND" etc.
+      'KKP S-PLUS': 'M0058_2565',
     };
 
     let projId = ALIAS_MAPPING[searchTicker];
@@ -74,6 +76,11 @@ class SecApi {
       // 2) Fallback: SEC often appends "FUND" to the project abbreviation (e.g. SCBGOLDHFUND)
       if (!projData && this.fundMapping[searchTicker + 'FUND']) {
         projData = this.fundMapping[searchTicker + 'FUND'];
+      }
+      
+      // 2b) Fallback: SEC stores some funds as "TICKER FUND" (with space) e.g. "KKP S-PLUS FUND"
+      if (!projData && this.fundMapping[searchTicker + ' FUND']) {
+        projData = this.fundMapping[searchTicker + ' FUND'];
       }
       
       // 3) Fallback: Share class suffixes with hyphens (e.g. UGIS-N -> UGIS)
