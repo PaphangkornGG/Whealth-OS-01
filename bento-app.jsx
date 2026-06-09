@@ -715,13 +715,15 @@ function App() {
 
     // 0) Fetch live USD/THB exchange rate
     try {
-      const fxUrl = `https://query1.finance.yahoo.com/v8/finance/chart/THB%3DX?interval=1d`;
-      const fxRes = await fetch(`https://corsproxy.io/?${encodeURIComponent(fxUrl)}`);
+      // THB=X is Yahoo Finance's symbol for USD/THB — do NOT pre-encode the = sign
+      const fxYfUrl = `https://query1.finance.yahoo.com/v8/finance/chart/THB=X?interval=1d`;
+      const fxRes = await fetch(`https://corsproxy.io/?${encodeURIComponent(fxYfUrl)}`);
       if (fxRes.ok) {
         const fxData = await fxRes.json();
         const rate = fxData?.chart?.result?.[0]?.meta?.regularMarketPrice;
         if (rate && rate > 20 && rate < 60) {
-          D.FX.USD_THB = rate;
+          D.FX.USD_THB = parseFloat(rate.toFixed(4));
+          updatedCount++; // trigger re-render and recalculation
         }
       }
     } catch(e) {
