@@ -133,7 +133,7 @@ function useGoals() {
         .from('goals')
         .select('*')
         .order('created_at', { ascending: true });
-      if (!error && data) {
+      if (!error && data && data.length > 0) {
         const formatted = data.map(g => ({
           id: g.id,
           label: { en: g.name, th: g.name },
@@ -146,6 +146,10 @@ function useGoals() {
           manualTHB: parseFloat(g.manual_thb || 0),
         })).map(g => ({ ...g, currentTHB: computeCurrent(g) }));
         setGoals(formatted);
+      } else {
+        // Table may not exist or empty — use localStorage
+        if (error) console.warn('Supabase goals fetch failed, using localStorage:', error.message);
+        setGoals(getAllGoals());
       }
       setLoading(false);
     } else {
@@ -176,6 +180,7 @@ function useGoals() {
     const supabase = window.supabaseClient;
     if (!supabase) {
       addGoal(goal);
+      window.dispatchEvent(new Event('netto:goals-changed'));
       return;
     }
     const { data: { session } } = await supabase.auth.getSession();
@@ -193,11 +198,15 @@ function useGoals() {
           linked_brokers: goal.linkedBrokers || [],
           manual_thb: goal.manualTHB || 0,
         });
-      if (!error) {
-        window.dispatchEvent(new Event('netto:goals-changed'));
+      if (error) {
+        console.warn('Supabase goals insert failed, falling back to localStorage:', error.message);
+        addGoal(goal); // fallback
       }
+      // Always refresh UI regardless of where we saved
+      window.dispatchEvent(new Event('netto:goals-changed'));
     } else {
       addGoal(goal);
+      window.dispatchEvent(new Event('netto:goals-changed'));
     }
   };
 
