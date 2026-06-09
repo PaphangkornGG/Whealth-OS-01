@@ -713,14 +713,12 @@ function App() {
     
     let updatedCount = 0;
 
-    // 0) Fetch live USD/THB exchange rate
+    // 0) Fetch live USD/THB exchange rate from open exchange rate API (supports CORS natively)
     try {
-      // THB=X is Yahoo Finance's symbol for USD/THB — do NOT pre-encode the = sign
-      const fxYfUrl = `https://query1.finance.yahoo.com/v8/finance/chart/THB=X?interval=1d`;
-      const fxRes = await fetch(`https://corsproxy.io/?${encodeURIComponent(fxYfUrl)}`);
+      const fxRes = await fetch('https://open.er-api.com/v6/latest/USD');
       if (fxRes.ok) {
         const fxData = await fxRes.json();
-        const rate = fxData?.chart?.result?.[0]?.meta?.regularMarketPrice;
+        const rate = fxData?.rates?.THB;
         if (rate && rate > 20 && rate < 60) {
           D.FX.USD_THB = parseFloat(rate.toFixed(4));
           updatedCount++; // trigger re-render and recalculation
