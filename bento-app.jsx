@@ -715,7 +715,7 @@ function App() {
 
     // 0) Fetch live USD/THB exchange rate
     try {
-      const fxUrl = `https://query1.finance.yahoo.com/v8/finance/chart/THBX%3DX?interval=1d`;
+      const fxUrl = `https://query1.finance.yahoo.com/v8/finance/chart/THB%3DX?interval=1d`;
       const fxRes = await fetch(`https://corsproxy.io/?${encodeURIComponent(fxUrl)}`);
       if (fxRes.ok) {
         const fxData = await fxRes.json();
