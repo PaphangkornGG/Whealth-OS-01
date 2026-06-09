@@ -50,13 +50,17 @@ class SecApi {
     
     // 1) Known aliases where SEC project ID differs from popular broker tickers
     const ALIAS_MAPPING = {
-      'SCBS&P500E': 'M0643_2555',
-      'SCBS&P500A': 'M0643_2555',
-      'SCBS&P500':  'M0643_2555',
-      'SCBGOLDH':   'M0502_2554',
-      'SCBPGF':     'M0101_2557',
-      // KKP funds: SEC stores them as "KKP S-PLUS FUND" etc.
-      'KKP S-PLUS': 'M0058_2565',
+      // SCB S&P500 — SEC stores as "SCBS&P500FUND"
+      'SCBS&P500E':  'M0643_2555',
+      'SCBS&P500A':  'M0643_2555',
+      'SCBS&P500':   'M0643_2555',
+      // SCB Gold Hedged — SEC stores as "SCBGOLDHFUND"
+      'SCBGOLDH':    'M0856_2553',
+      'SCBGOLDHRMF': 'M0778_2554',
+      // SCB Global Equity — SEC stores as "SCBPGFUND"
+      'SCBPGF':      'M0207_2549',
+      // KKP S-PLUS — SEC stores as "KKP S-PLUS FUND"
+      'KKP S-PLUS':  'M0058_2565',
     };
 
     let projId = ALIAS_MAPPING[searchTicker];
