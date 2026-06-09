@@ -712,6 +712,21 @@ function App() {
     const CRYPTO_MAP = { BTC: 'BTC-USD', ETH: 'ETH-USD', SOL: 'SOL-USD' };
     
     let updatedCount = 0;
+
+    // 0) Fetch live USD/THB exchange rate
+    try {
+      const fxUrl = `https://query1.finance.yahoo.com/v8/finance/chart/THBX%3DX?interval=1d`;
+      const fxRes = await fetch(`https://corsproxy.io/?${encodeURIComponent(fxUrl)}`);
+      if (fxRes.ok) {
+        const fxData = await fxRes.json();
+        const rate = fxData?.chart?.result?.[0]?.meta?.regularMarketPrice;
+        if (rate && rate > 20 && rate < 60) {
+          D.FX.USD_THB = rate;
+        }
+      }
+    } catch(e) {
+      // Keep using last known rate
+    }
     
     // 1) Sync holdings in portfolio (D.ENRICHED)
     for (const held of D.ENRICHED) {
