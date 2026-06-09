@@ -133,7 +133,7 @@ function useGoals() {
         .from('goals')
         .select('*')
         .order('created_at', { ascending: true });
-      if (!error && data && data.length > 0) {
+      if (!error && data) {
         const formatted = data.map(g => ({
           id: g.id,
           label: { en: g.name, th: g.name },
@@ -146,10 +146,8 @@ function useGoals() {
           manualTHB: parseFloat(g.manual_thb || 0),
         })).map(g => ({ ...g, currentTHB: computeCurrent(g) }));
         setGoals(formatted);
-      } else {
-        // Table may not exist or empty — use localStorage
-        if (error) console.warn('Supabase goals fetch failed, using localStorage:', error.message);
-        setGoals(getAllGoals());
+      } else if (error) {
+        console.error('goals fetch error:', error.message);
       }
       setLoading(false);
     } else {
@@ -178,36 +176,25 @@ function useGoals() {
 
   const addGoalAsync = async (goal) => {
     const supabase = window.supabaseClient;
-    if (!supabase) {
-      addGoal(goal);
-      window.dispatchEvent(new Event('netto:goals-changed'));
-      return;
-    }
+    if (!supabase) return;
     const { data: { session } } = await supabase.auth.getSession();
     const user = session?.user;
-    if (user) {
-      const { error } = await supabase
-        .from('goals')
-        .insert({
-          user_id: user.id,
-          name: typeof goal.label === 'object' ? (goal.label.th || goal.label.en) : goal.label,
-          target_amount: goal.target,
-          eta_year: goal.etaYear,
-          icon: goal.icon,
-          accent: goal.accent,
-          linked_brokers: goal.linkedBrokers || [],
-          manual_thb: goal.manualTHB || 0,
-        });
-      if (error) {
-        console.warn('Supabase goals insert failed, falling back to localStorage:', error.message);
-        addGoal(goal); // fallback
-      }
-      // Always refresh UI regardless of where we saved
-      window.dispatchEvent(new Event('netto:goals-changed'));
-    } else {
-      addGoal(goal);
-      window.dispatchEvent(new Event('netto:goals-changed'));
-    }
+    if (!user) return;
+    const { error } = await supabase
+      .from('goals')
+      .insert({
+        user_id: user.id,
+        name: typeof goal.label === 'object' ? (goal.label.th || goal.label.en) : goal.label,
+        target_amount: goal.target,
+        eta_year: goal.etaYear,
+        icon: goal.icon,
+        accent: goal.accent,
+        linked_brokers: goal.linkedBrokers || [],
+        manual_thb: goal.manualTHB || 0,
+      });
+    if (error) console.error('goals insert error:', error.message);
+    // Always re-fetch to update UI
+    await fetchGoals();
   };
 
   const updateGoalAsync = async (id, patch) => {
