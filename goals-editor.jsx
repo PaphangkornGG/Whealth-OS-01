@@ -83,7 +83,7 @@ function GoalEditorModal({ open, mode = 'create', goal = null, onClose, onSave, 
       linkedBrokers: form.linkedBrokers,
       manualTHB: manualN,
     });
-    onClose();
+    // Note: onClose is called by parent after the async onSave resolves
   }
 
   // Brokers grouped for the picker

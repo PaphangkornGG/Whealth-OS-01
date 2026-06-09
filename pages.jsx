@@ -476,9 +476,10 @@ function GoalsPage() {
         goal={editor.goal}
         lang={lang}
         onClose={close}
-        onSave={(payload) => {
-          if (editor.mode === 'edit' && editor.goal) updateGoal(editor.goal.id, payload);
-          else addGoal(payload);
+        onSave={async (payload) => {
+          if (editor.mode === 'edit' && editor.goal) await updateGoal(editor.goal.id, payload);
+          else await addGoal(payload);
+          close();
         }}
         onDelete={editor.mode === 'edit' && editor.goal ? () => removeGoal(editor.goal.id) : null}
       />
