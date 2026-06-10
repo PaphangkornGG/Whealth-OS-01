@@ -303,6 +303,7 @@ function PLCard() {
     return () => { active = false; };
   }, [range, D.TRANSACTIONS.length]);
 
+  // unrealized = ground truth: current price × units − cost basis
   const unrealized = D.TOTAL_THB - D.TOTAL_COST_THB;
   let periodChange = unrealized;
   let periodReturnPct = D.TOTAL_COST_THB > 0 ? (unrealized / D.TOTAL_COST_THB) * 100 : 0;
@@ -310,12 +311,23 @@ function PLCard() {
 
   if (data && data.portfolio.length > 0) {
     plSeries = data.portfolio.map((v, i) => v - data.costBasis[i]);
-    const startPL = plSeries[0];
-    const endPL = plSeries[plSeries.length - 1];
+
     if (range === 'ALL') {
-      periodChange = endPL; // All time P/L is simply the current P/L
-      periodReturnPct = data.costBasis[data.costBasis.length - 1] > 0 ? (endPL / data.costBasis[data.costBasis.length - 1]) * 100 : 0;
+      // For ALL TIME: headline = real unrealized P/L (not historical estimate)
+      // Scale the chart so the last point matches real P/L (keeps shape meaningful)
+      const endPL = plSeries[plSeries.length - 1];
+      if (endPL !== 0) {
+        const scale = unrealized / endPL;
+        plSeries = plSeries.map(v => v * scale);
+      } else {
+        plSeries[plSeries.length - 1] = unrealized;
+      }
+      periodChange = unrealized;
+      periodReturnPct = D.TOTAL_COST_THB > 0 ? (unrealized / D.TOTAL_COST_THB) * 100 : 0;
     } else {
+      // For sub-ranges: change = end − start of that period
+      const startPL = plSeries[0];
+      const endPL = plSeries[plSeries.length - 1];
       periodChange = endPL - startPL;
       const startValue = data.portfolio[0];
       if (startValue > 0) {
@@ -323,7 +335,7 @@ function PLCard() {
       }
     }
   } else {
-    // Fallback while loading
+    // Fallback chart shape while loading: use PORTFOLIO_SPARK scaled to real P/L
     const spark = D.PORTFOLIO_SPARK;
     const endSpark = spark[spark.length - 1];
     const scale = endSpark > 0 ? D.TOTAL_THB / endSpark : 0;
