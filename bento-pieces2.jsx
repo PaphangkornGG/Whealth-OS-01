@@ -280,17 +280,10 @@ function CashflowBento() {
                 className="flex-1 h-full flex flex-col items-center justify-end relative"
               >
                 <div className="w-full max-w-[60px] mx-auto relative" style={{ height: `${Math.max(totalH, 8)}%` }}>
-                  {highlight ? (
-                    <div className="absolute inset-0 rounded-[20px] flex flex-col-reverse overflow-hidden">
-                      <div className="bg-brand" style={{ height: `${(divsH / totalH) * 100}%`, minHeight: 8 }}></div>
-                      <div className="bg-lime" style={{ height: `${(gainsH / totalH) * 100}%`, minHeight: 8 }}></div>
-                    </div>
-                  ) : (
-                    <div className="absolute inset-0 rounded-[20px] bg-surface-soft border border-line" style={{
-                      backgroundImage: 'linear-gradient(135deg, transparent 49%, oklch(0.85 0.005 250) 49%, oklch(0.85 0.005 250) 51%, transparent 51%)',
-                      backgroundSize: '8px 8px',
-                    }}></div>
-                  )}
+                  <div className={`absolute inset-0 rounded-[20px] flex flex-col-reverse overflow-hidden transition-opacity ${highlight ? 'opacity-100' : 'opacity-60'}`}>
+                    <div className="bg-brand" style={{ height: `${(divsH / totalH) * 100}%`, minHeight: 8 }}></div>
+                    <div className="bg-lime" style={{ height: `${(gainsH / totalH) * 100}%`, minHeight: 8 }}></div>
+                  </div>
                 </div>
                 <span className={`mt-2 text-[10px] uppercase tracking-wider font-medium ${highlight ? 'text-ink-900' : 'text-ink-500'}`}>
                   {lang === 'th' ? d.monthTH : d.month}

@@ -253,6 +253,9 @@ function recomputeDerived() {
     const sum = D.ENRICHED.filter(a => a.cls === c.id).reduce((s, a) => s + (a.valueTHB || 0), 0);
     c.valueTHB = sum;
     c.pct = D.TOTAL_THB > 0 ? sum / D.TOTAL_THB : 0;
+    if (D.TARGET && D.TARGET[c.id] !== undefined) {
+      c.targetPct = D.TARGET[c.id];
+    }
     c.drift = c.pct - c.targetPct;
   });
 
