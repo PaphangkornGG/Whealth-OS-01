@@ -115,8 +115,8 @@ function BalanceCard() {
 
   const balance = ccy === 'THB' ? D.TOTAL_THB : D.TOTAL_THB / D.FX.USD_THB;
   const dayPct = D.DAILY_CHANGE_PCT || 0;
-  // hasSyncedDayChange = true only after syncPrices() has set real prevClose on at least one asset
-  const hasSyncedDayChange = D.ENRICHED.some(a => a.dayChangePct !== 0);
+  // hasSyncedDayChange = true only after syncPrices() completes
+  const hasSyncedDayChange = !!D.HAS_SYNCED;
 
   return (
     <Card className="relative overflow-hidden">
@@ -151,7 +151,11 @@ function BalanceCard() {
               ? <ChangeBadge value={dayPct}/>
               : <span className="inline-flex items-center gap-1 rounded-full font-semibold num bg-ink-100 text-ink-400 text-[11px] px-1.5 py-0.5" title={lang === 'th' ? 'กด Sync เพื่ออัปเดต' : 'Press Sync to update'}>— %</span>
             }
-            <span className="text-ink-500">{lang === 'th' ? 'วันนี้ · กด Sync เพื่ออัปเดต' : 'Today · Sync to update'}</span>
+            <span className="text-ink-500">
+              {lang === 'th'
+                ? (hasSyncedDayChange ? 'วันนี้' : 'วันนี้ · กด Sync เพื่ออัปเดต')
+                : (hasSyncedDayChange ? 'Today' : 'Today · Sync to update')}
+            </span>
           </div>
         </div>
         <div className="flex flex-col items-end justify-start h-full shrink-0">

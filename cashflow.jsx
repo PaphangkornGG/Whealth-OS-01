@@ -181,7 +181,7 @@ function CashflowCard({ horizon: externalHorizon, hideRange = false } = {}) {
               className="flex-1 flex flex-col items-center gap-1.5 group cursor-pointer min-w-0"
             >
               <div
-                className={`w-full rounded-sm transition-all ${active ? 'bg-warn' : 'bg-warn/50 group-hover:bg-warn/80'}`}
+                className={`w-full rounded-sm transition-all bg-warn ${active ? 'opacity-100' : 'opacity-60 group-hover:opacity-80'}`}
                 style={{ height: `${Math.max(h, 4)}%` }}
               ></div>
               <span className={`text-[9px] uppercase ${active ? 'text-warn' : 'text-ink-500'} font-medium`}>

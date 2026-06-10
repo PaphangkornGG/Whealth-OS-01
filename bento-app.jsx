@@ -911,8 +911,9 @@ function App() {
         b.pct = sum / D.TOTAL_THB;
       });
       
-      D.DAILY_CHANGE_PCT = D.ENRICHED.reduce((s, a) => s + ((a.dayChangePct || 0) * a.valueTHB), 0) / D.TOTAL_THB;
+      D.DAILY_CHANGE_PCT = D.TOTAL_THB > 0 ? D.ENRICHED.reduce((s, a) => s + ((a.dayChangePct || 0) * a.valueTHB), 0) / D.TOTAL_THB : 0;
       D.DAILY_CHANGE_THB = D.TOTAL_THB * (D.DAILY_CHANGE_PCT / 100);
+      D.HAS_SYNCED = true;
       
       const now = new Date();
       setLastSync(now.toLocaleTimeString([], { hour: '2-digit', minute: '2-digit', second: '2-digit' }));
