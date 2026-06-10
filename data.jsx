@@ -175,9 +175,8 @@ function enrich(a) {
   const totalReturn = unrealized + a.dividendsLifetime;
   const totalReturnPct = cost > 0 ? (totalReturn / cost) * 100 : 0;
   const valueTHB = toTHB(value, a.ccy);
-  const dayChangePct = a.spark && a.spark.length >= 2 && a.spark[a.spark.length-2] > 0
-    ? (a.spark[a.spark.length-1] - a.spark[a.spark.length-2]) / a.spark[a.spark.length-2] * 100
-    : 0;
+  // dayChangePct is 0 until syncPrices() fetches real prevClose from Yahoo Finance
+  const dayChangePct = 0;
   return { ...a, value, cost, unrealized, unrealizedPct, totalReturn, totalReturnPct, valueTHB, dayChangePct };
 }
 

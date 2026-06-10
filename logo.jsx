@@ -158,17 +158,24 @@ function StockLogo({
 
   if (src) {
     return (
-      <img
-        src={src}
-        alt={upper}
-        width={size}
-        height={size}
-        loading="lazy"
-        referrerPolicy="no-referrer"
-        onError={() => setErrored(true)}
-        className={`shrink-0 bg-white object-contain ${showFallbackBorder ? 'border border-ink-200' : ''} ${className}`}
-        style={{ ...baseStyle, padding: size >= 28 ? 3 : 2 }}
-      />
+      <div
+        className={`shrink-0 bg-white flex items-center justify-center overflow-hidden ${showFallbackBorder ? 'border border-ink-200' : ''} ${className}`}
+        style={{ ...baseStyle }}
+      >
+        <img
+          src={src}
+          alt={upper}
+          loading="lazy"
+          referrerPolicy="no-referrer"
+          onError={() => setErrored(true)}
+          style={{
+            width:  size - (size >= 28 ? 6 : 4),
+            height: size - (size >= 28 ? 6 : 4),
+            objectFit: 'contain',
+            flexShrink: 0,
+          }}
+        />
+      </div>
     );
   }
 
