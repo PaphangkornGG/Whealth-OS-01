@@ -987,11 +987,36 @@ function App() {
           if (meta.policyMode) localStorage.setItem('netto:policyMode', meta.policyMode);
         }
         // Logged in! Fetch transactions from Supabase
-        const { data, error } = await supabase
+        let { data, error } = await supabase
           .from('transactions')
           .select('*')
           .order('date', { ascending: false });
         
+        // Auto-migrate local transactions to Supabase if cloud is empty but local has data
+        if (!error && data && data.length === 0) {
+          const localTxs = JSON.parse(localStorage.getItem('netto:userTxs') || '[]');
+          if (localTxs.length > 0) {
+            const toInsert = localTxs.map(tx => ({
+              user_id: sessionUser.id,
+              date: typeof tx.date === 'string' ? tx.date : new Date(tx.date).toISOString(),
+              type: tx.type,
+              ticker: tx.ticker,
+              name: tx.name,
+              cls: tx.cls,
+              ccy: tx.ccy,
+              broker: tx.broker,
+              units: tx.units,
+              price: tx.price,
+              fee: tx.fee,
+              total: tx.total
+            }));
+            const { data: inserted, error: insertErr } = await supabase.from('transactions').insert(toInsert).select('*');
+            if (!insertErr && inserted) {
+              data = inserted.sort((a, b) => new Date(b.date) - new Date(a.date));
+            }
+          }
+        }
+
         if (!error && data) {
           const D = window.DataLayer;
           // Clear arrays in-place to preserve references
