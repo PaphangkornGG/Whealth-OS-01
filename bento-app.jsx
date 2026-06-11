@@ -990,7 +990,8 @@ function App() {
         let { data, error } = await supabase
           .from('transactions')
           .select('*')
-          .order('date', { ascending: false });
+          .order('date', { ascending: false })
+          .limit(10000);
         
         // Auto-migrate local transactions to Supabase if cloud is empty but local has data
         if (!error && data && data.length === 0) {
@@ -1043,7 +1044,7 @@ function App() {
           const chrono = [...D.TRANSACTIONS].reverse();
           chrono.forEach(tx => {
             let held = D.ENRICHED.find(a => a.ticker === tx.ticker && a.broker === tx.broker);
-            if (!held && tx.type === 'buy') {
+            if (!held) {
               const sibling = D.ENRICHED.find(a => a.ticker === tx.ticker);
               held = {
                 ticker: tx.ticker,
@@ -1127,7 +1128,7 @@ function App() {
           fresh.forEach(tx => {
             D.TRANSACTIONS.unshift(tx);
             let held = D.ENRICHED.find(a => a.ticker === tx.ticker && a.broker === tx.broker);
-            if (!held && tx.type === 'buy') {
+            if (!held) {
               const sibling = D.ENRICHED.find(a => a.ticker === tx.ticker);
               held = {
                 ticker: tx.ticker,

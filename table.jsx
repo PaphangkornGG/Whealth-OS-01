@@ -42,38 +42,40 @@ function AssetTable({ externalFilter, onClearFilter }) {
     else { setSortBy(id); setSortDir('desc'); }
   };
 
-  const rows = React.useMemo(() => {
-    let filtered = ENRICHED;
-    if (activeCls) filtered = filtered.filter(a => a.cls === activeCls);
-    if (activeBroker) filtered = filtered.filter(a => a.broker === activeBroker);
-    if (!activeCls && filterCls !== 'all') filtered = filtered.filter(a => a.cls === filterCls);
-    
-    // Apply name and symbol search filter
-    if (search.trim()) {
-      const q = search.toLowerCase().trim();
-      filtered = filtered.filter(a => 
-        a.ticker.toLowerCase().includes(q) || 
-        a.name.toLowerCase().includes(q)
-      );
-    }
+  const currentEnriched = window.DataLayer.ENRICHED || [];
+  let filtered = currentEnriched;
+  if (activeCls) filtered = filtered.filter(a => a.cls === activeCls);
+  if (activeBroker) filtered = filtered.filter(a => a.broker === activeBroker);
+  if (!activeCls && filterCls !== 'all') filtered = filtered.filter(a => a.cls === filterCls);
+  
+  // Apply name and symbol search filter
+  if (search.trim()) {
+    const q = search.toLowerCase().trim();
+    filtered = filtered.filter(a => 
+      a.ticker.toLowerCase().includes(q) || 
+      a.name.toLowerCase().includes(q)
+    );
+  }
 
-    const sorted = [...filtered].sort((a,b) => {
-      let av = a[sortBy], bv = b[sortBy];
-      if (sortBy === 'ticker' || sortBy === 'cls') {
-        av = String(av); bv = String(bv);
-        return sortDir === 'asc' ? av.localeCompare(bv) : bv.localeCompare(av);
-      }
-      return sortDir === 'asc' ? av - bv : bv - av;
-    });
-    return sorted;
-  }, [sortBy, sortDir, filterCls, activeBroker, activeCls, search]);
+  const rows = [...filtered].sort((a,b) => {
+    let av = a[sortBy], bv = b[sortBy];
+    if (sortBy === 'ticker' || sortBy === 'cls') {
+      av = String(av); bv = String(bv);
+      return sortDir === 'asc' ? av.localeCompare(bv) : bv.localeCompare(av);
+    }
+    return sortDir === 'asc' ? av - bv : bv - av;
+  });
 
   const filters = [
-    { id: 'all', label: t.all, count: ENRICHED.length },
+    { id: 'all', label: t.all, count: currentEnriched.length },
     ...Object.values(ASSET_CLASSES).map(c => ({
-      id: c.id, label: t.classes[c.id] || c.label, count: ENRICHED.filter(a => a.cls === c.id).length, color: c.color,
+      id: c.id, label: t.classes[c.id] || c.label, count: currentEnriched.filter(a => a.cls === c.id).length, color: c.color,
     })),
   ];
+  
+  const currentTotalCost = rows.reduce((s, a) => s + window.DataLayer.toTHB(a.cost, a.ccy), 0);
+  const currentTotalVal = rows.reduce((s, a) => s + a.valueTHB, 0);
+  const currentPL = currentTotalVal - currentTotalCost;
 
   return (
     <div className="bg-ink-50 border border-ink-200 rounded-2xl shadow-card overflow-hidden">
@@ -332,12 +334,12 @@ function AssetTable({ externalFilter, onClearFilter }) {
 
       {/* Footer / totals */}
       <div className="flex items-center justify-between px-5 py-3 border-t border-ink-200 text-[12px] text-ink-500 bg-ink-0/40">
-        <span>{t.showingX(rows.length, ENRICHED.length)}</span>
+        <span>{t.showingX(rows.length, currentEnriched.length)}</span>
         <div className="flex items-center gap-6 num">
-          <span>{t.totalCost} <span className="text-ink-700">{fmtTHB(window.DataLayer.TOTAL_COST_THB)}</span></span>
+          <span>{t.totalCost} <span className="text-ink-700">{fmtTHB(currentTotalCost)}</span></span>
           <div className="flex items-center gap-4 text-xs font-medium text-ink-700 bg-ink-100/50 px-3 py-2 rounded">
-            <span>{t.totalVal}: {fmtTHB(window.DataLayer.TOTAL_THB)}</span>
-            <span>{t.PL} <span className={window.DataLayer.TOTAL_THB - window.DataLayer.TOTAL_COST_THB >= 0 ? 'text-gain' : 'text-loss'}>{fmtTHB(window.DataLayer.TOTAL_THB - window.DataLayer.TOTAL_COST_THB, { sign: true })}</span></span>
+            <span>{t.totalVal}: {fmtTHB(currentTotalVal)}</span>
+            <span>{t.PL} <span className={currentPL >= 0 ? 'text-gain' : 'text-loss'}>{fmtTHB(currentPL, { sign: true })}</span></span>
           </div>
         </div>
       </div>
