@@ -997,20 +997,25 @@ function App() {
         if (!error && data && data.length === 0) {
           const localTxs = JSON.parse(localStorage.getItem('netto:userTxs') || '[]');
           if (localTxs.length > 0) {
-            const toInsert = localTxs.map(tx => ({
-              user_id: sessionUser.id,
-              date: typeof tx.date === 'string' ? tx.date : new Date(tx.date).toISOString(),
-              type: tx.type,
-              ticker: tx.ticker,
-              name: tx.name,
-              cls: tx.cls,
-              ccy: tx.ccy,
-              broker: tx.broker,
-              units: tx.units,
-              price: tx.price,
-              fee: tx.fee,
-              total: tx.total
-            }));
+            const toInsert = localTxs.map(tx => {
+              let tAmount = tx.amount || tx.units || 0;
+              let tPrice = tx.price || 0;
+              let tTotal = tx.total !== undefined && tx.total !== null ? tx.total : (tx.type === 'dividend' ? tAmount : tAmount * tPrice);
+              return {
+                user_id: sessionUser.id,
+                date: typeof tx.date === 'string' ? tx.date : new Date(tx.date).toISOString(),
+                type: tx.type || 'buy',
+                ticker: tx.ticker || 'UNKNOWN',
+                name: tx.name || tx.ticker || 'UNKNOWN',
+                cls: tx.cls || 'th',
+                ccy: tx.ccy || 'THB',
+                broker: tx.broker || 'UNKNOWN',
+                units: tx.units || null,
+                price: tx.price || null,
+                fee: tx.fee || 0,
+                total: tTotal
+              };
+            });
             const { data: inserted, error: insertErr } = await supabase.from('transactions').insert(toInsert).select('*');
             if (!insertErr && inserted) {
               data = inserted.sort((a, b) => new Date(b.date) - new Date(a.date));
