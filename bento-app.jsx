@@ -992,6 +992,13 @@ function App() {
           .select('*')
           .order('date', { ascending: false })
           .limit(10000);
+
+        if (error) {
+          console.error("Supabase fetch error:", error);
+          if (typeof showToast === 'function') {
+            showToast(`Database Error: ${error.message}. Please run supabase_schema.sql`);
+          }
+        }
         
         // Auto-migrate local transactions to Supabase if cloud is empty but local has data
         if (!error && data && data.length === 0) {
