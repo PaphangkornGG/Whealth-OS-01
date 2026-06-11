@@ -1024,7 +1024,12 @@ function App() {
               };
             });
             const { data: inserted, error: insertErr } = await supabase.from('transactions').insert(toInsert).select('*');
-            if (!insertErr && inserted) {
+            if (insertErr) {
+              console.error("Auto-migrate insert error:", insertErr);
+              if (typeof showToast === 'function') {
+                showToast(`Sync Error: ${insertErr.message}. Check your local data.`);
+              }
+            } else if (inserted) {
               data = inserted.sort((a, b) => new Date(b.date) - new Date(a.date));
             }
           }
