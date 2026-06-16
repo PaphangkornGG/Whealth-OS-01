@@ -57,7 +57,54 @@ function AssetTable({ externalFilter, onClearFilter }) {
     );
   }
 
-  const rows = [...filtered].sort((a,b) => {
+  // Group closed positions (0 units) into a single row to reduce clutter
+  let activeHoldings = [];
+  let closedHoldings = [];
+  filtered.forEach(a => {
+    // Treat as closed if units is extremely close to 0
+    if (Math.abs(a.units) <= 0.0001) {
+      closedHoldings.push(a);
+    } else {
+      activeHoldings.push(a);
+    }
+  });
+
+  if (closedHoldings.length > 0) {
+    const lumped = closedHoldings.reduce((acc, curr) => {
+      acc.cost += curr.cost;
+      acc.valueTHB += curr.valueTHB;
+      acc.unrealized += curr.unrealized;
+      acc.dividendsLifetime += (curr.dividendsLifetime || 0);
+      acc.feesLifetime += (curr.feesLifetime || 0);
+      acc.realizedGL += (curr.realizedGL || 0);
+      return acc;
+    }, {
+      ticker: 'Closed Positions',
+      name: `${closedHoldings.length} assets sold completely`,
+      cls: 'cash',
+      broker: null,
+      units: 0,
+      avgCost: 0,
+      price: 0,
+      cost: 0,
+      valueTHB: 0,
+      unrealized: 0,
+      unrealizedPct: 0,
+      dividendsLifetime: 0,
+      feesLifetime: 0,
+      realizedGL: 0,
+      totalReturnPct: 0,
+      ccy: 'THB',
+      spark: []
+    });
+    // For closed positions, the total return in THB is just realized GL + dividends
+    // We cannot easily show a percentage return for a lumped row of different currencies and costs over time.
+    // So we just keep the percentage at 0 and let the user see the THB value in the tooltip/details if needed.
+    // Or we could try to calculate totalReturnPct if we had the total capital invested.
+    activeHoldings.push(lumped);
+  }
+
+  const rows = [...activeHoldings].sort((a,b) => {
     let av = a[sortBy], bv = b[sortBy];
     if (sortBy === 'ticker' || sortBy === 'cls') {
       av = String(av); bv = String(bv);
