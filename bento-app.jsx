@@ -870,6 +870,7 @@ function App() {
           } catch (err) {
             console.error('Failed to sync watchlist', queryTicker, err);
           }
+        }
         if (watchUpdated) {
           localStorage.setItem('netto:watchlist', JSON.stringify(watchlist));
           window.dispatchEvent(new Event('netto:watchlist-changed'));
